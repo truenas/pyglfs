@@ -246,6 +246,7 @@ static bool py_glfs_init_ctx(py_glfs_t *self)
 	size_t i;
 	ssize_t sz;
 	int err;
+	char buf[16];
 
 	fs = glfs_new(self->name);
 	if (fs == NULL) {
@@ -287,11 +288,18 @@ static bool py_glfs_init_ctx(py_glfs_t *self)
 		return false;
 	}
 
-	sz = glfs_get_volumeid(fs, self->vol_id, sizeof(self->vol_id));
+	sz = glfs_get_volumeid(fs, buf, sizeof(buf));
 	if (sz == -1) {
 		set_exc_from_errno("glfs_get_volumeid()");
 		glfs_fini(fs);
 		return false;
+	}
+	if (sz == 16) {
+		uuid_t ui;
+		for (i = 0; i < sizeof(buf); i++) {
+			ui[i] = (unsigned char)buf[i];
+		}
+		uuid_unparse(ui, self->vol_id);
 	}
 
 	self->fs = fs;
@@ -407,6 +415,15 @@ static PyObject *py_glfs_get_root(PyObject *obj,
 	return init_glfs_object(self, gl_obj, &st);
 }
 
+static PyObject *py_glfs_volume_repr(PyObject *obj)
+{
+	py_glfs_t *self = (py_glfs_t *)obj;
+	return PyUnicode_FromFormat(
+		"pyglfs.Volume(name=%s, uuid=%s)",
+		self->name, self->vol_id
+	);
+}
+
 static PyObject *py_glfs_getcwd(PyObject *obj,
 			        PyObject *args_unused,
 			        PyObject *kwargs_unused)
@@ -448,7 +465,7 @@ static PyGetSetDef py_glfs_volume_getsetters[] = {
 		.get     = (getter)py_glfs_get_volume_name,
 	},
 	{
-		.name    = discard_const_p(char, "id"),
+		.name    = discard_const_p(char, "uuid"),
 		.get     = (getter)py_glfs_get_volume_id,
 	},
 	{
@@ -469,6 +486,7 @@ PyTypeObject PyGlfsVolume = {
 	.tp_getset = py_glfs_volume_getsetters,
 	.tp_new = py_glfs_new,
 	.tp_init = py_glfs_init,
+	.tp_repr = py_glfs_volume_repr,
 	.tp_doc = "Glusterfs filesystem handle",
 	.tp_dealloc = (destructor)py_glfs_dealloc,
 	.tp_flags = Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,

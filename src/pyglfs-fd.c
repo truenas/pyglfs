@@ -286,7 +286,10 @@ static PyObject *py_glfs_fd_pwrite(PyObject *obj,
 	}
 
 	Py_BEGIN_ALLOW_THREADS
-	_return_value = glfs_pwrite(self->fd, buffer.buf, (size_t)buffer.len, offset, flags, NULL, NULL);
+	_return_value = glfs_pwrite(
+		self->fd, buffer.buf, (size_t)buffer.len, offset, flags,
+		NULL, NULL
+	);
 	Py_END_ALLOW_THREADS
 
 	if (_return_value == -1) {
