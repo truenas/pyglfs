@@ -305,6 +305,90 @@ cleanup:
 	return return_value;
 }
 
+static PyObject *py_glfs_fd_posix_lock(PyObject *obj,
+				       PyObject *args,
+				       PyObject *kwargs)
+{
+	py_glfs_fd_t *self = (py_glfs_fd_t *)obj;
+	int cmd;
+	bool verbose = false;
+	struct flock fl = {
+		.l_type = -1,
+		.l_whence = SEEK_SET,
+		.l_len = 1,
+		.l_start = 0,
+		.l_pid = 0
+	};
+	const char *kwnames [] = {
+		"cmd",
+		"type",
+		"whence",
+		"start",
+		"len",
+		"verbose",
+		NULL
+	};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+					 "ih|hLLb",
+					 discard_const_p(char *, kwnames),
+					 &cmd,
+					 &fl.l_type,
+					 &fl.l_whence,
+					 &fl.l_start,
+					 &fl.l_len,
+					 &verbose)) {
+		return NULL;
+	}
+
+	if ((cmd != F_GETLK) &&
+	    (cmd != F_SETLK) &&
+	    (cmd != F_SETLKW)) {
+		PyErr_Format(
+			PyExc_ValueError,
+			"%d: Invalid locking command.", cmd
+		);
+		return NULL;
+	}
+
+	if ((fl.l_type != F_RDLCK) &&
+	    (fl.l_type != F_WRLCK) &&
+	    (fl.l_type != F_UNLCK)) {
+		PyErr_Format(
+			PyExc_ValueError,
+			"%d: Invalid lock type.", fl.l_type
+		);
+		return NULL;
+	}
+
+	if ((cmd == F_GETLK) && (fl.l_type == F_UNLCK)) {
+		PyErr_SetString(
+			PyExc_ValueError,
+			"Lock type of F_UNLCK may not be specified "
+			"for an operation to read lock"
+		);
+		return NULL;
+	}
+
+	if (glfs_posix_lock(self->fd, cmd, &fl) != 0) {
+		set_exc_from_errno("glfs_posix_lock()");
+		return NULL;
+	}
+
+	if (!verbose)
+		Py_RETURN_NONE;
+
+	return Py_BuildValue(
+		"{s:i,s:h,s:h,s:L,s:L,s:i}",
+		"command", cmd,
+		"type", fl.l_type,
+		"whence", fl.l_whence,
+		"start", fl.l_start,
+		"length", fl.l_len,
+		"pid", fl.l_pid
+	);
+}
+
 static PyMethodDef py_glfs_fd_methods[] = {
 	{
 		.ml_name = "fstat",
@@ -359,6 +443,12 @@ static PyMethodDef py_glfs_fd_methods[] = {
 		.ml_meth = (PyCFunction)py_glfs_fd_pwrite,
 		.ml_flags = METH_VARARGS,
 		.ml_doc = "write to file"
+	},
+	{
+		.ml_name = "posix_lock",
+		.ml_meth = (PyCFunction)py_glfs_fd_posix_lock,
+		.ml_flags = METH_VARARGS | METH_KEYWORDS,
+		.ml_doc = "lock file"
 	},
 	{ NULL, NULL, 0, NULL }
 };
