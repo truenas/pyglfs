@@ -580,9 +580,46 @@ static PyObject *py_glfs_getcwd(PyObject *obj,
 
 	if (cwd == NULL) {
 		set_exc_from_errno("glfs_getcwd()");
+		return NULL;
 	}
 
 	return Py_BuildValue("s", cwd);
+}
+
+static PyObject *py_glfs_open_by_uuid(PyObject *obj,
+				      PyObject *args,
+				      PyObject *kwargs_unused)
+{
+	py_glfs_t *self = (py_glfs_t *)obj;
+	const char *uuid_str = NULL;
+	glfs_object_t *gl_obj = NULL;
+	struct stat st;
+	uuid_t ui;
+
+	if (!PyArg_ParseTuple(args, "s", &uuid_str)) {
+		return NULL;
+	}
+
+	if (uuid_parse(uuid_str, ui) == -1) {
+		set_exc_from_errno("uuid_parse()");
+		return NULL;
+	}
+
+	Py_BEGIN_ALLOW_THREADS
+	gl_obj = glfs_h_create_from_handle(
+		self->fs,
+		ui,
+		sizeof(ui),
+		&st
+	);
+	Py_END_ALLOW_THREADS
+
+	if (gl_obj == NULL) {
+		set_exc_from_errno("glfs_h_create_from_handle()");
+		return NULL;
+	}
+
+	return init_glfs_object(self, gl_obj, &st);
 }
 
 static PyMethodDef py_glfs_volume_methods[] = {
@@ -591,6 +628,12 @@ static PyMethodDef py_glfs_volume_methods[] = {
 		.ml_meth = (PyCFunction)py_glfs_get_root,
 		.ml_flags = METH_NOARGS,
 		.ml_doc = "Get glusterfs object for root of volume"
+	},
+	{
+		.ml_name = "open_by_uuid",
+		.ml_meth = (PyCFunction)py_glfs_open_by_uuid,
+		.ml_flags = METH_VARARGS,
+		.ml_doc = "Get glusterfs object by uuid"
 	},
 	{
 		.ml_name = "getcwd",

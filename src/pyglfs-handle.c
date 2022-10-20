@@ -42,6 +42,8 @@ PyObject *init_glfs_object(py_glfs_t *py_fs,
 {
 	py_glfs_obj_t *hdl = NULL;
 	PyObject *pyst = NULL;
+	uuid_t ui;
+	ssize_t rv;
 
 	hdl = (py_glfs_obj_t *)PyObject_CallFunction((PyObject *)&PyGlfsObject, "");
 	if (hdl == NULL) {
@@ -55,6 +57,18 @@ PyObject *init_glfs_object(py_glfs_t *py_fs,
 			return NULL;
 		}
 	}
+
+	Py_BEGIN_ALLOW_THREADS
+	rv = glfs_h_extract_handle(gl_obj, ui, sizeof(ui));
+	Py_END_ALLOW_THREADS
+
+	if (rv == -1) {
+		set_exc_from_errno("glfs_h_extract_handle()");
+		Py_DECREF(hdl);
+		Py_DECREF(pyst);
+		return NULL;
+	}
+	uuid_unparse(ui, hdl->uuid_str);
 	hdl->py_fs = py_fs;
 	Py_INCREF(hdl->py_fs);
 	hdl->gl_obj = gl_obj;
@@ -282,6 +296,13 @@ static PyMethodDef py_glfs_obj_methods[] = {
 	{ NULL, NULL, 0, NULL }
 };
 
+static PyObject *py_glfs_obj_get_uuid(PyObject *obj, void *closure)
+{
+	py_glfs_obj_t *self = (py_glfs_obj_t *)obj;
+
+	return Py_BuildValue("s", self->uuid_str);
+}
+
 static PyObject *py_glfs_obj_get_stat(PyObject *obj, void *closure)
 {
 	py_glfs_obj_t *self = (py_glfs_obj_t *)obj;
@@ -297,6 +318,10 @@ static PyGetSetDef py_glfs_obj_getsetters[] = {
 	{
 		.name    = discard_const_p(char, "cached_stat"),
 		.get     = (getter)py_glfs_obj_get_stat,
+	},
+	{
+		.name    = discard_const_p(char, "uuid"),
+		.get     = (getter)py_glfs_obj_get_uuid,
 	},
 	{ .name = NULL }
 };
