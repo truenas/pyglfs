@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: pyglfs
+Source: https://github.com/anodos325/pyglfs
+Comment: Build-depends on package in contrib
+
+Files: *
+Copyright: 2022 Andrew Walker <awalker@ixsystems.com>
+License: LGPL-3.0+
