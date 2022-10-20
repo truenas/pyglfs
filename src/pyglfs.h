@@ -6,20 +6,21 @@
 #define Py_TPFLAGS_HAVE_ITER 0
 
 typedef struct glfs_volfile_server {
-        char host[PATH_MAX]; /* hosts or local path */
-        char proto[5]; /* TCP, UNIX, RDMA */
-        int port;
+	char host[PATH_MAX]; /* hosts or local path */
+	char proto[5]; /* TCP, UNIX, RDMA */
+	int port;
 } glfs_volfile_server_t;
 
 typedef struct {
-        PyObject_HEAD
-        glfs_t *fs;
-        char name[NAME_MAX + 1]; /* GD_VOLUME_NAME_MAX */;
-        glfs_volfile_server_t *volfile_servers;
-        size_t srv_cnt;
-        char log_file[PATH_MAX];
-        char vol_id[39]; /* GF_UUID_BUF_SIZE + 1 */
-        int log_level;
+	PyObject_HEAD
+	PyObject *xlators;
+	glfs_t *fs;
+	char name[NAME_MAX + 1]; /* GD_VOLUME_NAME_MAX */;
+	glfs_volfile_server_t *volfile_servers;
+	size_t srv_cnt;
+	char log_file[PATH_MAX];
+	char vol_id[39]; /* GF_UUID_BUF_SIZE + 1 */
+	int log_level;
 } py_glfs_t;
 
 typedef struct {

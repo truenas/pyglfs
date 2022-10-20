@@ -27,6 +27,36 @@ static PyObject *py_glfs_get_volume_id(PyObject *obj, void *closure)
 	return Py_BuildValue("s", self->vol_id);
 }
 
+static PyObject *py_glfs_get_xlators(PyObject *obj, void *closure)
+{
+	py_glfs_t *self = (py_glfs_t *)obj;
+	PyObject *out = NULL;
+	Py_ssize_t len, i;
+
+	if (self->xlators == NULL) {
+		Py_RETURN_NONE;
+	}
+
+	len = PyList_Size(self->xlators);
+	out = PyList_New(len);
+	for (i = 0; i < len; i++) {
+		PyObject *xlator = NULL;
+		xlator = PyList_GetItem(self->xlators, i);
+		if (xlator == NULL) {
+			Py_DECREF(out);
+			return NULL;
+		}
+
+		if (PyList_SetItem(out, i, xlator) == -1) {
+			Py_DECREF(out);
+			return NULL;
+		}
+		Py_INCREF(xlator);
+	}
+
+	return out;
+}
+
 static PyObject *py_glfs_get_volfile_servers(PyObject *obj, void *closure)
 {
 	py_glfs_t *self = (py_glfs_t *)obj;
@@ -240,6 +270,101 @@ static bool py_glfs_init_fill_volfile(py_glfs_t *self,
 	return true;
 }
 
+
+/*
+ * Set the specified xlator entry. This should be a tuple
+ * of (xlator, key, value) strings.
+ */
+static bool set_xlator(PyObject *entry, glfs_t *fs, Py_ssize_t idx)
+{
+	Py_ssize_t i;
+	struct {
+		const char *desc;
+		const char *res;
+	} p[] = {
+		{ "xlator", NULL },
+		{ "key", NULL },
+		{ "value", NULL },
+	};
+
+	if (!PyTuple_Check(entry)) {
+		PyErr_Format(
+			PyExc_TypeError,
+			"xlator list entry %zu is not a tuple.", idx
+		);
+		return false;
+	}
+
+	if (PyTuple_Size(entry) != 3) {
+		PyErr_Format(
+			PyExc_ValueError,
+			"xlator list entry %zu is invalid. "
+			"list entries must be a tuple of "
+			"(xlator name, key, and value)", idx
+		);
+	}
+
+	for (i = 0; i < PyTuple_Size(entry); i++) {
+		PyObject *obj = PyTuple_GetItem(entry, i);
+
+		if (!PyUnicode_Check(obj)) {
+			PyErr_Format(
+				PyExc_TypeError,
+				"xlator entry %zu has invalid %s"
+				"must be string.", idx, p[i].desc
+			);
+		}
+
+		p[i].res = PyUnicode_AsUTF8AndSize(obj, NULL);
+		if (p[i].res == NULL) {
+			return false;
+		}
+	}
+
+	if (!glfs_set_xlator_option(fs, p[0].res, p[1].res, p[2].res)) {
+		PyErr_Format(
+			PyExc_RuntimeError,
+			"set_xlator_option() failed: %s. Payload was: "
+			"xlator - %s, key - %s, value - %s",
+			strerror(errno), p[0].res, p[1].res, p[2].res
+		);
+		return false;
+	}
+
+	return true;
+}
+
+/* iterate through list of xlator tuples, validate, and set them */
+static bool set_xlators(PyObject *xlators, glfs_t *fs)
+{
+	Py_ssize_t i;
+
+	if (xlators == NULL) {
+		return true;
+	}
+
+	if (!PyList_Check(xlators)) {
+		PyErr_SetString(
+			PyExc_TypeError,
+			"Must be list of xlator tuples."
+		);
+		return false;
+	}
+
+	for (i = 0; i < PyList_Size(xlators); i++) {
+		PyObject *entry = PyList_GetItem(xlators, i);
+		if (entry == NULL) {
+			return false;
+		}
+
+		if (!set_xlator(entry, fs, i)) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 static bool py_glfs_init_ctx(py_glfs_t *self)
 {
 	glfs_t *fs = NULL;
@@ -267,14 +392,23 @@ static bool py_glfs_init_ctx(py_glfs_t *self)
 				"proto: %s, host: %s, port: %d",
 				i, srv->proto, srv->host, srv->port
 			);
+			glfs_fini(fs);
 			return false;
 		}
         }
+
+	if (!set_xlators(self->xlators, fs)) {
+		free(self->volfile_servers);
+		self->volfile_servers = NULL;
+		glfs_fini(fs);
+		return false;
+	}
 
 	if (self->log_file[0] != '\0') {
 		err = glfs_set_logging(fs, self->log_file, self->log_level);
 		if (err) {
 			set_exc_from_errno("glfs_set_logging()");
+			glfs_fini(fs);
 			return false;
 		}
 	}
@@ -285,6 +419,7 @@ static bool py_glfs_init_ctx(py_glfs_t *self)
 
 	if (err) {
 		set_exc_from_errno("glfs_init()");
+		glfs_fini(fs);
 		return false;
 	}
 
@@ -314,21 +449,23 @@ static int py_glfs_init(PyObject *obj,
 	py_glfs_t *self = (py_glfs_t *)obj;
 	const char *volname = NULL;
 	PyObject *volfile_list = NULL;
+	PyObject *xlators = NULL;
 	const char *log_file = NULL;
 	int log_level = -1;
 
 	const char *kwnames [] = {
 		"volume_name",
 		"volfile_servers",
+		"xlators",
 		"log_file",
 		"log_level",
 		NULL
 	};
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "sO|si",
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "sO|Osi",
 					 kwnames, &volname,
-					 &volfile_list, &log_file,
-					 &log_level)) {
+					 &volfile_list, &xlators,
+					 &log_file, &log_level)) {
 		return -1;
 	}
 
@@ -363,6 +500,9 @@ static int py_glfs_init(PyObject *obj,
 		strlcpy(self->log_file, log_file, sizeof(self->log_file));
 	}
 
+	self->log_level = log_level;
+	self->xlators = xlators;
+
 	if (!py_glfs_init_fill_volfile(self, volfile_list)) {
 		return -1;
 	}
@@ -382,7 +522,9 @@ static void py_glfs_dealloc(py_glfs_t *self)
 	}
 
 	if (self->fs != NULL) {
+		Py_BEGIN_ALLOW_THREADS
 		glfs_fini(self->fs);
+		Py_END_ALLOW_THREADS
 		self->fs = NULL;
 	}
 	Py_TYPE(self)->tp_free((PyObject *)self);
@@ -475,6 +617,10 @@ static PyGetSetDef py_glfs_volume_getsetters[] = {
 	{
 		.name    = discard_const_p(char, "logging"),
 		.get     = (getter)py_glfs_get_logging,
+	},
+	{
+		.name    = discard_const_p(char, "translators"),
+		.get     = (getter)py_glfs_get_xlators,
 	},
 	{ .name = NULL }
 };
