@@ -463,8 +463,8 @@ static int py_glfs_init(PyObject *obj,
 	};
 
 	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "sO|Osi",
-					 kwnames, &volname,
-					 &volfile_list, &xlators,
+					 discard_const_p(char *, kwnames),
+					 &volname, &volfile_list, &xlators,
 					 &log_file, &log_level)) {
 		return -1;
 	}

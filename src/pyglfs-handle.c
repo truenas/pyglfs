@@ -86,7 +86,8 @@ static PyObject *py_glfs_obj_lookup(PyObject *obj, PyObject *args, PyObject *kwa
 	const char *kwnames [] = { "path", "stat", "symlink_follow", NULL };
 
 	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|bb",
-					 kwnames, &path,
+					 discard_const_p(char *, kwnames),
+					 &path,
 					 &do_stat, &follow)) {
 		return NULL;
 	}
@@ -121,7 +122,8 @@ static PyObject *py_glfs_obj_create(PyObject *obj, PyObject *args, PyObject *kwa
 	const char *kwnames [] = { "path", "flags", "stat", "mode", NULL };
 
 	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "si|bi",
-					 kwnames, &path, &flags,
+					 discard_const_p(char *, kwnames),
+					 &path, &flags,
 					 &do_stat, &mode)) {
 		return NULL;
 	}
@@ -156,8 +158,8 @@ static PyObject *py_glfs_obj_mkdir(PyObject *obj, PyObject *args, PyObject *kwar
 	const char *kwnames [] = { "path", "stat", "mode", NULL };
 
 	if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|bi",
-					 kwnames, &path,
-					 &do_stat, &mode)) {
+					 discard_const_p(char *, kwnames),
+					 &path, &do_stat, &mode)) {
 		return NULL;
 	}
 
