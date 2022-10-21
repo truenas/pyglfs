@@ -3,7 +3,7 @@
 #include "includes.h"
 #include "pyglfs.h"
 
-#define Py_TPFLAGS_HAVE_ITER 0
+static PyObject *PyExc_GLFSError;
 
 void set_exc_from_errno(const char *func)
 {
@@ -12,6 +12,62 @@ void set_exc_from_errno(const char *func)
 		"%s failed: %s", func, strerror(errno)
 	);
 }
+
+void _set_glfs_exc(const char *additional_info, const char *location)
+{
+	PyObject *v = NULL;
+	PyObject *args = NULL;
+	PyObject *errstr = NULL;
+
+	if (additional_info) {
+		errstr = PyUnicode_FromFormat(
+			"%s: %s",
+			additional_info,
+			strerror(errno)
+		);
+	} else {
+		errstr = Py_BuildValue("%s", strerror(errno));
+	}
+	if (errstr == NULL) {
+		goto simple_err;
+	}
+
+	args = Py_BuildValue("(iNs)", errno, errstr, location);
+	if (args == NULL) {
+		Py_XDECREF(errstr);
+		goto simple_err;
+	}
+
+	v = PyObject_Call(PyExc_GLFSError, args, NULL);
+	if (v == NULL) {
+		Py_CLEAR(args);
+		return;
+	}
+
+	if (PyObject_SetAttrString(v, "errno", PyTuple_GetItem(args, 0)) == -1) {
+		Py_CLEAR(args);
+		Py_CLEAR(v);
+		return;
+	}
+
+	if (PyObject_SetAttrString(v, "location", PyTuple_GetItem(args, 2)) == -1) {
+		Py_CLEAR(args);
+		Py_CLEAR(v);
+		return;
+	}
+	Py_CLEAR(args);
+
+	PyErr_SetObject((PyObject *) Py_TYPE(v), v);
+	Py_DECREF(v);
+	return;
+
+simple_err:
+	PyErr_Format(
+		PyExc_GLFSError, "[%d]: %s",
+		errno, strerror(errno)
+	);
+}
+
 
 #define MODULE_DOC "Minimal libglfs python bindings."
 
@@ -45,7 +101,23 @@ PyObject* module_init(void)
 	if (PyType_Ready(init_pystat_type()) < 0)
 		return NULL;
 
-	PyModule_AddObject(m, "Volume", (PyObject *)&PyGlfsVolume);
+	PyExc_GLFSError = PyErr_NewException("pyglfs.GLFSError",
+					     PyExc_RuntimeError,
+					     NULL);
+	if (PyExc_GLFSError == NULL) {
+		Py_DECREF(m);
+		return NULL;
+	}
+
+	if (PyModule_AddObject(m, "GLFSError", PyExc_GLFSError) < 0) {
+		Py_DECREF(m);
+		return NULL;
+	}
+
+	if (PyModule_AddObject(m, "Volume", (PyObject *)&PyGlfsVolume) < 0) {
+		Py_DECREF(m);
+		return NULL;
+	}
 
 	return m;
 }

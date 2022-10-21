@@ -375,7 +375,7 @@ static bool py_glfs_init_ctx(py_glfs_t *self)
 
 	fs = glfs_new(self->name);
 	if (fs == NULL) {
-		set_exc_from_errno("glfs_new()");
+		set_glfs_exc("glfs_new()");
 		return false;
         }
 
@@ -407,7 +407,7 @@ static bool py_glfs_init_ctx(py_glfs_t *self)
 	if (self->log_file[0] != '\0') {
 		err = glfs_set_logging(fs, self->log_file, self->log_level);
 		if (err) {
-			set_exc_from_errno("glfs_set_logging()");
+			set_glfs_exc("glfs_set_logging()");
 			glfs_fini(fs);
 			return false;
 		}
@@ -418,14 +418,14 @@ static bool py_glfs_init_ctx(py_glfs_t *self)
 	Py_END_ALLOW_THREADS
 
 	if (err) {
-		set_exc_from_errno("glfs_init()");
+		set_glfs_exc("glfs_init()");
 		glfs_fini(fs);
 		return false;
 	}
 
 	sz = glfs_get_volumeid(fs, buf, sizeof(buf));
 	if (sz == -1) {
-		set_exc_from_errno("glfs_get_volumeid()");
+		set_glfs_exc("glfs_get_volumeid()");
 		glfs_fini(fs);
 		return false;
 	}
@@ -550,7 +550,7 @@ static PyObject *py_glfs_get_root(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (gl_obj == NULL) {
-		set_exc_from_errno("glfs_h_lookupat()");
+                set_glfs_exc("glfs_h_lookupat()");
 		return NULL;
 	}
 
@@ -579,7 +579,7 @@ static PyObject *py_glfs_getcwd(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (cwd == NULL) {
-		set_exc_from_errno("glfs_getcwd()");
+		set_glfs_exc("glfs_getcwd()");
 		return NULL;
 	}
 
@@ -615,7 +615,7 @@ static PyObject *py_glfs_open_by_uuid(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (gl_obj == NULL) {
-		set_exc_from_errno("glfs_h_create_from_handle()");
+		set_glfs_exc("glfs_h_create_from_handle()");
 		return NULL;
 	}
 

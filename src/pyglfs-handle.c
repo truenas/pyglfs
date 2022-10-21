@@ -63,7 +63,7 @@ PyObject *init_glfs_object(py_glfs_t *py_fs,
 	Py_END_ALLOW_THREADS
 
 	if (rv == -1) {
-		set_exc_from_errno("glfs_h_extract_handle()");
+		set_glfs_exc("glfs_h_extract_handle()");
 		Py_DECREF(hdl);
 		Py_DECREF(pyst);
 		return NULL;
@@ -102,7 +102,7 @@ static PyObject *py_glfs_obj_lookup(PyObject *obj, PyObject *args, PyObject *kwa
 	Py_END_ALLOW_THREADS
 
 	if (gl_obj == NULL) {
-		set_exc_from_errno("glfs_h_lookupat()");
+		set_glfs_exc("glfs_h_lookupat()");
 		return NULL;
 	}
 
@@ -138,7 +138,7 @@ static PyObject *py_glfs_obj_create(PyObject *obj, PyObject *args, PyObject *kwa
 	Py_END_ALLOW_THREADS
 
 	if (gl_obj == NULL) {
-		set_exc_from_errno("glfs_h_creat()");
+		set_glfs_exc("glfs_h_creat()");
 		return NULL;
 	}
 
@@ -172,7 +172,7 @@ static PyObject *py_glfs_obj_mkdir(PyObject *obj, PyObject *args, PyObject *kwar
 	Py_END_ALLOW_THREADS
 
 	if (gl_obj == NULL) {
-		set_exc_from_errno("glfs_h_creat()");
+		set_glfs_exc("glfs_h_mkdir()");
 		return NULL;
 	}
 
@@ -196,7 +196,7 @@ static PyObject *py_glfs_obj_unlink(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (err) {
-		set_exc_from_errno("glfs_h_unlink()");
+		set_glfs_exc("glfs_h_unlink()");
 		return NULL;
 	}
 	Py_RETURN_NONE;
@@ -216,7 +216,7 @@ static PyObject *py_glfs_obj_stat(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (err) {
-		set_exc_from_errno("glfs_h_unlink()");
+		set_glfs_exc("glfs_h_stat()");
 		return NULL;
 	}
 
@@ -249,7 +249,7 @@ static PyObject *py_glfs_obj_open(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (gl_fd == NULL) {
-		set_exc_from_errno("glfs_h_open()");
+		set_glfs_exc("glfs_h_open()");
 		return NULL;
 	}
 

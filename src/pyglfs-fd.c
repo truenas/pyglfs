@@ -66,7 +66,7 @@ static PyObject *py_glfs_fd_fstat(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (err) {
-		set_exc_from_errno("glfs_fstat()");
+		set_glfs_exc("glfs_fstat()");
 		return NULL;
 	}
 
@@ -85,7 +85,7 @@ static PyObject *py_glfs_fd_fsync(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (err) {
-		set_exc_from_errno("glfs_fsync()");
+		set_glfs_exc("glfs_fsync()");
 		return NULL;
 	}
 
@@ -104,7 +104,7 @@ static PyObject *py_glfs_fd_fchdir(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (err) {
-		set_exc_from_errno("glfs_fchdir()");
+		set_glfs_exc("glfs_fchdir()");
 		return NULL;
 	}
 
@@ -128,7 +128,7 @@ static PyObject *py_glfs_fd_fchmod(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (err) {
-		set_exc_from_errno("glfs_fchmod()");
+		set_glfs_exc("glfs_fchmod()");
 		return NULL;
 	}
 
@@ -153,7 +153,7 @@ static PyObject *py_glfs_fd_fchown(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (err) {
-		set_exc_from_errno("glfs_fchown()");
+		set_glfs_exc("glfs_fchown()");
 		return NULL;
 	}
 
@@ -177,7 +177,7 @@ static PyObject *py_glfs_fd_ftruncate(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (err) {
-		set_exc_from_errno("glfs_ftruncate()");
+		set_glfs_exc("glfs_ftruncate()");
 		return NULL;
 	}
 
@@ -202,7 +202,7 @@ static PyObject *py_glfs_fd_lseek(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (err) {
-		set_exc_from_errno("glfs_lseek()");
+		set_glfs_exc("glfs_lseek()");
 		return NULL;
 	}
 
@@ -240,6 +240,8 @@ static PyObject *py_glfs_fd_pread(PyObject *obj,
 
 	if (n < 0) {
 		Py_DECREF(buffer);
+		set_glfs_exc("glfs_pread()");
+		return NULL;
 	}
 
 	if (n != cnt) {
@@ -293,7 +295,7 @@ static PyObject *py_glfs_fd_pwrite(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (_return_value == -1) {
-		set_exc_from_errno("glfs_pread()");
+		set_glfs_exc("glfs_pwrite()");
 	} else {
 		return_value = PyLong_FromSsize_t(_return_value);
 	}
@@ -371,7 +373,7 @@ static PyObject *py_glfs_fd_posix_lock(PyObject *obj,
 	}
 
 	if (glfs_posix_lock(self->fd, cmd, &fl) != 0) {
-		set_exc_from_errno("glfs_posix_lock()");
+		set_glfs_exc("glfs_posix_lock()");
 		return NULL;
 	}
 
