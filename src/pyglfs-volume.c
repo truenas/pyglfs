@@ -640,51 +640,129 @@ static PyObject *py_glfs_open_by_uuid(PyObject *obj,
 	return init_glfs_object(self, gl_obj, &st);
 }
 
+PyDoc_STRVAR(py_glfs_get_root_handle__doc__,
+"Open a new pyglfs.ObjectHandle object for the root `/` of gluster\n"
+"volume. This may be used as basis of opening object handles for other\n"
+"files and directories in the gluster volume."
+);
+
+PyDoc_STRVAR(py_glfs_open_by_uuid__doc__,
+"Open a new pyglfs.ObjectHandle by UUID.\n"
+"This requires knowing the UUID for the object beforehand."
+);
+
+PyDoc_STRVAR(py_glfs_getcwd__doc__,
+"Get the current working directory (string) for the volume mount."
+);
+
 static PyMethodDef py_glfs_volume_methods[] = {
 	{
 		.ml_name = "get_root_handle",
 		.ml_meth = (PyCFunction)py_glfs_get_root,
 		.ml_flags = METH_NOARGS,
-		.ml_doc = "Get glusterfs object for root of volume"
+		.ml_doc = py_glfs_get_root_handle__doc__
 	},
 	{
 		.ml_name = "open_by_uuid",
 		.ml_meth = (PyCFunction)py_glfs_open_by_uuid,
 		.ml_flags = METH_VARARGS,
-		.ml_doc = "Get glusterfs object by uuid"
+		.ml_doc = py_glfs_open_by_uuid__doc__
 	},
 	{
 		.ml_name = "getcwd",
 		.ml_meth = (PyCFunction)py_glfs_getcwd,
 		.ml_flags = METH_NOARGS,
-		.ml_doc = "Get current working directory"
+		.ml_doc = py_glfs_getcwd__doc__
 	},
 	{ NULL, NULL, 0, NULL }
 };
+
+PyDoc_STRVAR(py_glfs_get_volume_name__doc__,
+"Name of the volume. This identifies the server-side volume and\n"
+"the fetched volfile (equivalent of --volfile-id command line\n"
+"parameter to glusterfsd).\n"
+);
+
+PyDoc_STRVAR(py_glfs_get_volume_id__doc__,
+"Volume uuid for the gluster volume"
+);
+
+PyDoc_STRVAR(py_glfs_get_volfile_servers__doc__,
+"List of addresses for the management server.\n"
+"The list is comprised of python Dict objects containing the following keys:\n"
+"`proto` - string specifying the transport used to connect to the\n"
+"  management daemon (permitted values are `tcp` and `rdma`).\n"
+"`host` - string specifying the address where to find the management daemon\n"
+"  (IP address or FQDN may be used).\n"
+"`port` - int TCP port number where gluster management daemon is listening.\n"
+"  Value of `0` uses the default port number GF_DEFAULT_BASE_PORT.\n\n"
+);
+
+PyDoc_STRVAR(py_glfs_get_logging__doc__,
+":log_file: The logfile to be used for logging. "
+"If this is not specified then directory associated with the glusterfs "
+"installation is used.\n"
+":log_level: Int specifying the degree of logging verbosity.\n"
+);
+
+PyDoc_STRVAR(py_glfs_get_xlators__doc__,
+"List of glusterfs xlator options enabled on the virtual mount.\n"
+"Each list entry is a tuple of strings: (<name of the xlator>, <key>, <value>)\n"
+);
 
 static PyGetSetDef py_glfs_volume_getsetters[] = {
 	{
 		.name    = discard_const_p(char, "name"),
 		.get     = (getter)py_glfs_get_volume_name,
+		.doc     = py_glfs_get_volume_name__doc__,
 	},
 	{
 		.name    = discard_const_p(char, "uuid"),
 		.get     = (getter)py_glfs_get_volume_id,
+		.doc     = py_glfs_get_volume_id__doc__,
 	},
 	{
 		.name    = discard_const_p(char, "volfile_servers"),
 		.get     = (getter)py_glfs_get_volfile_servers,
+		.doc     = py_glfs_get_volfile_servers__doc__,
 	},
 	{
 		.name    = discard_const_p(char, "logging"),
 		.get     = (getter)py_glfs_get_logging,
+		.doc     = py_glfs_get_logging__doc__,
 	},
 	{
 		.name    = discard_const_p(char, "translators"),
 		.get     = (getter)py_glfs_get_xlators,
+		.doc     = py_glfs_get_xlators__doc__,
 	},
 	{ .name = NULL }
 };
+
+PyDoc_STRVAR(py_glfs_volume__doc__,
+"Volume: This object wraps around a glfs_t (virtual mount) object.\n\n"
+"Takes the following parameters:\n"
+":volume_name: Name of the volume. This identifies the server-side volume and\n"
+"  the fetched volfile (equivalent of --volfile-id command line\n"
+"  parameter to glusterfsd).\n\n"
+":volfile_servers: specifies the list of addresses for the management server\n"
+"  (glusterd) to connect, and establish the volume configuration. \n"
+"  The list is comprised of python Dict objects containing the following keys:\n"
+"  `proto` - string specifying the transport used to connect to the\n"
+"    management daemon (permitted values are `tcp` and `rdma`).\n"
+"  `host` - string specifying the address where to find the management daemon\n"
+"    (IP address or FQDN may be used).\n"
+"  `port` - int TCP port number where gluster management daemon is listening.\n"
+"    Value of `0` uses the default port number GF_DEFAULT_BASE_PORT.\n\n"
+":translators: specifies list of glusterfs xlators to enable on the virtual mount.\n"
+"  Each list entry must be a tuple of strings as follows:\n"
+"  (<name of the xlator>, <key>, <value>)\n\n"
+":log_file: The logfile to be used for logging. Will be created if it does not\n"
+"  already exist (provided system permissions allow).\n"
+"  If this is not specified then a new logfile will be created in default log\n"
+"  directory associated with the glusterfs installation.\n\n"
+":log_level: Int specifying the degree of logging verbosity.\n"
+);
 
 PyTypeObject PyGlfsVolume = {
 	.tp_name = "pyglfs.Volume",
@@ -694,7 +772,7 @@ PyTypeObject PyGlfsVolume = {
 	.tp_new = py_glfs_new,
 	.tp_init = py_glfs_init,
 	.tp_repr = py_glfs_volume_repr,
-	.tp_doc = "Glusterfs filesystem handle",
+	.tp_doc = py_glfs_volume__doc__,
 	.tp_dealloc = (destructor)py_glfs_dealloc,
 	.tp_flags = Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,
 };
