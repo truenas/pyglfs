@@ -574,6 +574,277 @@ static PyObject *py_glfs_fd_posix_lock(PyObject *obj,
 	);
 }
 
+PyDoc_STRVAR(py_glfs_fd_flistxattr__doc__,
+"flistxattr()\n"
+"--\n\n"
+"retrieves the list of extended attribute names associated with the given "
+"glusterfs file descriptor object.\n\n"
+"Parameters\n"
+"----------\n"
+"None\n\n"
+"Returns\n"
+"-------\n"
+"names : list\n"
+"   list of strings containing xattr names\n"
+);
+
+static PyObject *py_glfs_fd_flistxattr(PyObject *obj,
+				       PyObject *no_args,
+				       PyObject *no_kwargs)
+{
+	py_glfs_fd_t *self = (py_glfs_fd_t *)obj;
+	Py_ssize_t i;
+	PyObject *result = NULL;
+	char *buffer = NULL;
+
+	for (i = 0; ; i++) {
+		const char *start, *trace, *end;
+		ssize_t length;
+		static const Py_ssize_t buffer_sizes[] = { 256, XATTR_LIST_MAX, 0 };
+		Py_ssize_t buffer_size = buffer_sizes[i];
+
+		if (!buffer_size) {
+			/* ERANGE */
+			set_glfs_exc("glfs_flistxattr()");
+			break;
+		}
+		buffer = PyMem_MALLOC(buffer_size);
+		if (!buffer) {
+			PyErr_NoMemory();
+			break;
+		}
+
+		Py_BEGIN_ALLOW_THREADS;
+		length = glfs_flistxattr(self->fd, buffer, buffer_size);
+		Py_END_ALLOW_THREADS;
+
+		if (length < 0) {
+			if (errno == ERANGE) {
+				PyMem_FREE(buffer);
+				buffer = NULL;
+				continue;
+			}
+			set_glfs_exc("glfs_flistxattr()");
+			break;
+		}
+
+		result = PyList_New(0);
+		if (!result) {
+			goto exit;
+		}
+		end = buffer + length;
+		for (trace = start = buffer; trace != end; trace++) {
+			if (!*trace) {
+				int error;
+				PyObject *attribute = PyUnicode_DecodeFSDefaultAndSize(
+					start, trace - start
+				);
+				if (!attribute) {
+					Py_DECREF(result);
+					result = NULL;
+					goto exit;
+				}
+				error = PyList_Append(result, attribute);
+				Py_DECREF(attribute);
+				if (error) {
+					Py_DECREF(result);
+					result = NULL;
+					goto exit;
+				}
+				start = trace + 1;
+			}
+		}
+		break;
+	}
+exit:
+	if (buffer)
+		PyMem_FREE(buffer);
+
+	return result;
+}
+
+PyDoc_STRVAR(py_glfs_fd_fgetxattr__doc__,
+"fgetxattr(xattr_name)\n"
+"--\n\n"
+"retrieves value of the specified extended attribute associated with the given "
+"glusterfs file descriptor object.\n\n"
+"Parameters\n"
+"----------\n"
+"xattr_name : str\n"
+"    Name of the extended attribute to retrieve\n"
+"Returns\n"
+"-------\n"
+"value : bytes\n"
+"   Value of specified extended attribute.\n"
+);
+
+static PyObject *py_glfs_fd_fgetxattr(PyObject *obj,
+				      PyObject *args,
+				      PyObject *no_kwargs)
+{
+	py_glfs_fd_t *self = (py_glfs_fd_t *)obj;
+	const char *attr = NULL;
+	Py_ssize_t i;
+	PyObject *buffer = NULL;
+
+	if (!PyArg_ParseTuple(args, "s", &attr)) {
+		return NULL;
+	}
+
+	for (i = 0; ; i++) {
+		void *ptr;
+		ssize_t result;
+		static const Py_ssize_t buffer_sizes[] = {128, XATTR_SIZE_MAX, 0};
+		Py_ssize_t buffer_size = buffer_sizes[i];
+
+		if (!buffer_size) {
+			set_glfs_exc("glfs_fgetxattr()");
+			return NULL;
+		}
+
+		buffer = PyBytes_FromStringAndSize(NULL, buffer_size);
+		if (!buffer)
+			return NULL;
+
+		ptr = PyBytes_AS_STRING(buffer);
+
+		Py_BEGIN_ALLOW_THREADS;
+		result = glfs_fgetxattr(self->fd, attr, ptr, buffer_size);
+		Py_END_ALLOW_THREADS;
+
+		if (result < 0) {
+			Py_DECREF(buffer);
+			if (errno == ERANGE)
+				continue;
+
+			set_glfs_exc("glfs_fgetxattr()");
+			return NULL;
+		}
+
+		if (result != buffer_size) {
+			/* Can only shrink. */
+			_PyBytes_Resize(&buffer, result);
+		}
+		break;
+	}
+
+	return buffer;
+}
+
+PyDoc_STRVAR(py_glfs_fd_fsetxattr__doc__,
+"fsetxattr(xattr_name, xattr_value, flags)\n"
+"--\n\n"
+"Sets value of the specified extended attribute associated with the given "
+"glusterfs file descriptor object.\n\n"
+"Parameters\n"
+"----------\n"
+"xattr_name : str\n"
+"    Name of the extended attribute to set.\n"
+"xattr_value : bytes\n"
+"    Value of the extended attribute to set.\n"
+"flags : int\n"
+"    flags may be XATTR_REPLACE or XATTR_CREATE. For description\n"
+"    of these flags see manpage for fsetxattr(2).\n\n"
+"Returns\n"
+"-------\n"
+"None\n"
+);
+
+static PyObject *py_glfs_fd_fsetxattr(PyObject *obj,
+				      PyObject *args,
+				      PyObject *no_kwargs)
+{
+	py_glfs_fd_t *self = (py_glfs_fd_t *)obj;
+	PyObject *buf = NULL;
+	ssize_t result = -1;
+	const char *attr = NULL;
+	int flags;
+	Py_buffer value = {NULL, NULL};
+
+	if (!PyArg_ParseTuple(args, "sOi", &attr, &buf, &flags)) {
+		return NULL;
+	}
+
+	if (!PyObject_CheckBuffer(buf)) {
+		PyErr_SetString(
+			PyExc_TypeError,
+			"not a buffer."
+		);
+		goto cleanup;
+	}
+
+	if (PyObject_GetBuffer(buf, &value, PyBUF_SIMPLE) != 0) {
+		goto cleanup;
+	}
+
+	if (!PyBuffer_IsContiguous(&value, 'C')) {
+		PyErr_SetString(
+			PyExc_TypeError,
+			"buffer must be contiguous."
+		);
+		goto cleanup;
+	}
+
+	Py_BEGIN_ALLOW_THREADS;
+	result = glfs_fsetxattr(self->fd, attr,
+				value.buf, value.len, flags);
+	Py_END_ALLOW_THREADS;
+
+	if (result) {
+		set_glfs_exc("glfs_fsetxattr()");
+	}
+
+cleanup:
+	if (value.obj) {
+		PyBuffer_Release(&value);
+	}
+
+	if (result == -1) {
+		return NULL;
+	}
+
+	Py_RETURN_NONE;
+}
+
+PyDoc_STRVAR(py_glfs_fd_fremovexattr__doc__,
+"fremovexattr(xattr_name)\n"
+"--\n\n"
+"Remove the specified extended attribute associated with the given "
+"glusterfs file descriptor object.\n\n"
+"Parameters\n"
+"----------\n"
+"xattr_name : str\n"
+"    Name of the extended attribute to remove.\n\n"
+"Returns\n"
+"-------\n"
+"None\n"
+
+);
+
+static PyObject *py_glfs_fd_fremovexattr(PyObject *obj,
+					 PyObject *args,
+					 PyObject *no_kwargs)
+{
+	py_glfs_fd_t *self = (py_glfs_fd_t *)obj;
+	const char *attr = NULL;
+	int err;
+
+	if (!PyArg_ParseTuple(args, "s", &attr)) {
+		return NULL;
+	}
+
+	Py_BEGIN_ALLOW_THREADS;
+	err = glfs_fremovexattr(self->fd, attr);
+	Py_END_ALLOW_THREADS;
+
+	if (err) {
+		set_glfs_exc("glfs_fremovexattr()");
+		return NULL;
+	}
+
+	Py_RETURN_NONE;
+}
+
 static PyMethodDef py_glfs_fd_methods[] = {
 	{
 		.ml_name = "fstat",
@@ -634,6 +905,30 @@ static PyMethodDef py_glfs_fd_methods[] = {
 		.ml_meth = (PyCFunction)py_glfs_fd_posix_lock,
 		.ml_flags = METH_VARARGS | METH_KEYWORDS,
 		.ml_doc = py_glfs_fd_posix_lock__doc__
+	},
+	{
+		.ml_name = "flistxattr",
+		.ml_meth = (PyCFunction)py_glfs_fd_flistxattr,
+		.ml_flags = METH_NOARGS,
+		.ml_doc = py_glfs_fd_flistxattr__doc__
+	},
+	{
+		.ml_name = "fgetxattr",
+		.ml_meth = (PyCFunction)py_glfs_fd_fgetxattr,
+		.ml_flags = METH_VARARGS,
+		.ml_doc = py_glfs_fd_fgetxattr__doc__
+	},
+	{
+		.ml_name = "fsetxattr",
+		.ml_meth = (PyCFunction)py_glfs_fd_fsetxattr,
+		.ml_flags = METH_VARARGS,
+		.ml_doc = py_glfs_fd_fsetxattr__doc__
+	},
+	{
+		.ml_name = "fremovexattr",
+		.ml_meth = (PyCFunction)py_glfs_fd_fremovexattr,
+		.ml_flags = METH_VARARGS,
+		.ml_doc = py_glfs_fd_fremovexattr__doc__
 	},
 	{ NULL, NULL, 0, NULL }
 };
