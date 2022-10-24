@@ -31,9 +31,15 @@ static PyStructSequence_Field stat_result_fields[] = {
 	{"st_uid", "user ID of owner"},
 	{"st_gid", "group ID of owner"},
 	{"st_size", "total size in bytes"},
-	{"st_atime", "time of last access"},
-	{"st_mtime", "time of last modification"},
-	{"st_ctime", "time of last change"},
+	{"st_atime", "integer time of last access"},
+	{"st_mtime", "integer time of last modification"},
+	{"st_ctime", "integer time of last change"},
+	{"st_atime_float", "time of last access"},
+	{"st_mtime_float", "time of last modification"},
+	{"st_ctime_float", "time of last change"},
+	{"st_atime_ns",   "time of last access in nanoseconds"},
+	{"st_mtime_ns",   "time of last modification in nanoseconds"},
+	{"st_ctime_ns",   "time of last change in nanoseconds"},
 	{"st_blksize", "blocksize for filesystem I/O"},
 	{"st_blocks", "number of blocks allocated"},
 	{"st_rdev", "device type (if inode device)"},
@@ -51,6 +57,48 @@ static PyStructSequence_Desc stat_result_desc = {
 };
 
 #define XID2PY(xid) (xid == (uid_t)-1 ? PyLong_FromLong(-1) : PyLong_FromUnsignedLong(xid))
+
+static void
+fill_time(PyObject *v, int index, time_t sec, unsigned long nsec)
+{
+	PyObject *s = PyLong_FromLongLong((long long)sec);
+	PyObject *ns_fractional = PyLong_FromUnsignedLong(nsec);
+	PyObject *billion = PyLong_FromLong(1000000000);
+	PyObject *s_in_ns = NULL;
+	PyObject *ns_total = NULL;
+	PyObject *float_s = NULL;
+
+	if (!(s && ns_fractional && billion))
+		goto exit;
+
+	s_in_ns = PyNumber_Multiply(s, billion);
+	if (!s_in_ns)
+		goto exit;
+
+	ns_total = PyNumber_Add(s_in_ns, ns_fractional);
+	if (!ns_total)
+		goto exit;
+
+	float_s = PyFloat_FromDouble(sec + 1e-9*nsec);
+	if (!float_s) {
+		goto exit;
+	}
+
+	PyStructSequence_SET_ITEM(v, index, s);
+	PyStructSequence_SET_ITEM(v, index+3, float_s);
+	PyStructSequence_SET_ITEM(v, index+6, ns_total);
+	s = NULL;
+	float_s = NULL;
+	ns_total = NULL;
+exit:
+	Py_XDECREF(s);
+	Py_XDECREF(billion);
+	Py_XDECREF(ns_fractional);
+	Py_XDECREF(s_in_ns);
+	Py_XDECREF(ns_total);
+	Py_XDECREF(float_s);
+}
+
 PyObject *stat_to_pystat(struct stat *st)
 {
 	PyObject *v = PyStructSequence_New(pystat_typ);
@@ -64,11 +112,13 @@ PyObject *stat_to_pystat(struct stat *st)
 	PyStructSequence_SET_ITEM(v, 4, XID2PY(st->st_uid));
 	PyStructSequence_SET_ITEM(v, 5, XID2PY(st->st_gid));
 	PyStructSequence_SET_ITEM(v, 6, PyLong_FromLongLong(st->st_size));
-#if 0 /* TODO: add timestamps */
 
-#endif
-	PyStructSequence_SET_ITEM(v, 10, PyLong_FromLong((long)st->st_blocks));
-	PyStructSequence_SET_ITEM(v, 11, PyLong_FromLong((long)st->st_rdev));
+	fill_time(v, 7, st->st_atime, st->st_atim.tv_nsec);
+	fill_time(v, 8, st->st_mtime, st->st_mtim.tv_nsec);
+	fill_time(v, 9, st->st_ctime, st->st_ctim.tv_nsec);
+
+	PyStructSequence_SET_ITEM(v, 16, PyLong_FromLong((long)st->st_blocks));
+	PyStructSequence_SET_ITEM(v, 19, PyLong_FromLong((long)st->st_rdev));
 
 	if (PyErr_Occurred()) {
 		Py_DECREF(v);
@@ -80,6 +130,7 @@ PyObject *stat_to_pystat(struct stat *st)
 
 PyTypeObject *init_pystat_type(void)
 {
+	stat_result_desc.name = "pyglfs.stat_result";
 	pystat_typ = PyStructSequence_NewType(&stat_result_desc);
 	Py_INCREF(pystat_typ);
 	return pystat_typ;
