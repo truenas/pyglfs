@@ -95,6 +95,24 @@ PyObject *init_glfs_object(py_glfs_t *py_fs,
 	return (PyObject *)hdl;
 }
 
+PyDoc_STRVAR(py_glfs_obj_lookup__doc__,
+"lookup(path, stat=False, symlink_follow=False)\n"
+"--\n\n"
+"Lookup existing GLFS object by path.\n\n"
+"Parameters\n"
+"----------\n"
+"path : str\n"
+"    Path of object relative to this handle.\n"
+"stat : bool, optional, default=True\n"
+"    Retrieve stat information for object while performing lookup.\n"
+"symlink_follow: bool, optional, default=True\n"
+"    Follow symlinks while performing lookup.\n\n"
+"Returns\n"
+"-------\n"
+"pyglfs.ObjectHandle\n"
+"    New GLFS handle\n"
+);
+
 static PyObject *py_glfs_obj_lookup(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
 	py_glfs_obj_t *self = (py_glfs_obj_t *)obj;
@@ -128,6 +146,28 @@ static PyObject *py_glfs_obj_lookup(PyObject *obj, PyObject *args, PyObject *kwa
 
 	return init_glfs_object(self->py_fs, gl_obj, do_stat ? &st : NULL);
 }
+
+PyDoc_STRVAR(py_glfs_obj_create__doc__,
+"create(path, flags, stat=False, symlink_follow=False, mode=0o644)\n"
+"--\n\n"
+"Create new GLFS object (file) by path.\n\n"
+"Parameters\n"
+"----------\n"
+"path : str\n"
+"    Path of object relative to this handle.\n"
+"flags : int\n"
+"    open(2) flags to use to open the handle.\n"
+"stat : bool, optional, default=True\n"
+"    Retrieve stat information for object while performing create.\n"
+"symlink_follow: bool, optional, default=True\n"
+"    Follow symlinks while performing create.\n\n"
+"mode : bool, optional, default=0o644\n"
+"    Permissions to set on newly created directory.\n\n"
+"Returns\n"
+"-------\n"
+"pyglfs.ObjectHandle\n"
+"    New GLFS handle\n"
+);
 
 static PyObject *py_glfs_obj_create(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
@@ -166,6 +206,26 @@ static PyObject *py_glfs_obj_create(PyObject *obj, PyObject *args, PyObject *kwa
 	return init_glfs_object(self->py_fs, gl_obj, do_stat ? &st : NULL);
 }
 
+PyDoc_STRVAR(py_glfs_obj_mkdir__doc__,
+"mkdir(path, stat=False, mode=0o755)\n"
+"--\n\n"
+"Create new GLFS object (directory) by path.\n\n"
+"Parameters\n"
+"----------\n"
+"path : str\n"
+"    Path of object relative to this handle.\n"
+"flags : int\n"
+"    open(2) flags to use to open the handle.\n"
+"stat : bool, optional, default=True\n"
+"    Retrieve stat information for object while performing create.\n"
+"mode : bool, optional, default=0o755\n"
+"    Permissions to set on newly created directory.\n\n"
+"Returns\n"
+"-------\n"
+"pyglfs.ObjectHandle\n"
+"    New GLFS handle\n"
+);
+
 static PyObject *py_glfs_obj_mkdir(PyObject *obj, PyObject *args, PyObject *kwargs)
 {
 	py_glfs_obj_t *self = (py_glfs_obj_t *)obj;
@@ -200,6 +260,19 @@ static PyObject *py_glfs_obj_mkdir(PyObject *obj, PyObject *args, PyObject *kwar
 	return init_glfs_object(self->py_fs, gl_obj, do_stat ? &st : NULL);
 }
 
+PyDoc_STRVAR(py_glfs_obj_unlink__doc__,
+"unlink(path)\n"
+"--\n\n"
+"Unlink (delete) path under GLFS object.\n\n"
+"Parameters\n"
+"----------\n"
+"path : str\n"
+"    Path relative to this handle.\n"
+"Returns\n"
+"-------\n"
+"None\n"
+);
+
 static PyObject *py_glfs_obj_unlink(PyObject *obj,
 				    PyObject *args,
 				    PyObject *kwargs_unused)
@@ -222,6 +295,19 @@ static PyObject *py_glfs_obj_unlink(PyObject *obj,
 	}
 	Py_RETURN_NONE;
 }
+
+PyDoc_STRVAR(py_glfs_obj_stat__doc__,
+"stat()\n"
+"--\n\n"
+"Stat the glfs object. Performs fresh stat and updates\n"
+"cache for object.\n\n"
+"Parameters\n"
+"----------\n"
+"None\n\n"
+"Returns\n"
+"-------\n"
+"stat_result\n"
+);
 
 static PyObject *py_glfs_obj_stat(PyObject *obj,
 				  PyObject *args_unused,
@@ -253,6 +339,19 @@ static PyObject *py_glfs_obj_stat(PyObject *obj,
 	return new_st;
 }
 
+PyDoc_STRVAR(py_glfs_obj_open__doc__,
+"open(flags)\n"
+"--\n\n"
+"Open a GLFS file descriptor.\n\n"
+"Parameters\n"
+"----------\n"
+"flags : int\n"
+"    open(2) flags to use to open the handle. O_CREAT is not supported.\n\n"
+"Returns\n"
+"-------\n"
+"pyglfs.FD\n"
+"    GLFS file descriptor object\n"
+);
 static PyObject *py_glfs_obj_open(PyObject *obj,
 				  PyObject *args,
 				  PyObject *kwargs_unused)
@@ -282,37 +381,37 @@ static PyMethodDef py_glfs_obj_methods[] = {
 		.ml_name = "lookup",
 		.ml_meth = (PyCFunction)py_glfs_obj_lookup,
 		.ml_flags = METH_VARARGS | METH_KEYWORDS,
-		.ml_doc = "lookup existing path and return handle."
+		.ml_doc = py_glfs_obj_lookup__doc__
 	},
 	{
 		.ml_name = "create",
 		.ml_meth = (PyCFunction)py_glfs_obj_create,
 		.ml_flags = METH_VARARGS | METH_KEYWORDS,
-		.ml_doc = "create file and return handle."
+		.ml_doc = py_glfs_obj_create__doc__
 	},
 	{
 		.ml_name = "mkdir",
 		.ml_meth = (PyCFunction)py_glfs_obj_mkdir,
 		.ml_flags = METH_VARARGS | METH_KEYWORDS,
-		.ml_doc = "mkdir and return handle."
+		.ml_doc = py_glfs_obj_mkdir__doc__
 	},
 	{
 		.ml_name = "unlink",
 		.ml_meth = (PyCFunction)py_glfs_obj_unlink,
 		.ml_flags = METH_VARARGS,
-		.ml_doc = "unlinkat path under object."
+		.ml_doc = py_glfs_obj_unlink__doc__
 	},
 	{
 		.ml_name = "stat",
 		.ml_meth = (PyCFunction)py_glfs_obj_stat,
 		.ml_flags = METH_VARARGS,
-		.ml_doc = "stat object."
+		.ml_doc = py_glfs_obj_stat__doc__
 	},
 	{
 		.ml_name = "open",
 		.ml_meth = (PyCFunction)py_glfs_obj_open,
 		.ml_flags = METH_VARARGS,
-		.ml_doc = "Open gluster object and get gluster fd"
+		.ml_doc = py_glfs_obj_open__doc__
 	},
 	{ NULL, NULL, 0, NULL }
 };
@@ -335,17 +434,46 @@ static PyObject *py_glfs_obj_get_stat(PyObject *obj, void *closure)
 	return self->py_st;
 }
 
+PyDoc_STRVAR(py_glfs_obj_get_stat__doc__,
+"Cached stat information. This may be auto-populated depending on\n"
+"how the GLFS object was created or refreshed via arguments passed\n"
+"to operation on the handle.\n"
+);
+
+
+PyDoc_STRVAR(py_glfs_obj_get_uuid__doc__,
+"UUID for GLFS object handle.\n"
+"This is exctracted when the python object was created, and may be used\n"
+"to open the file via the open_by_uuid() method for the glfs.Volume object.\n"
+);
+
 static PyGetSetDef py_glfs_obj_getsetters[] = {
 	{
 		.name    = discard_const_p(char, "cached_stat"),
 		.get     = (getter)py_glfs_obj_get_stat,
+		.doc     = py_glfs_obj_get_stat__doc__,
 	},
 	{
 		.name    = discard_const_p(char, "uuid"),
 		.get     = (getter)py_glfs_obj_get_uuid,
+		.doc     = py_glfs_obj_get_uuid__doc__,
 	},
 	{ .name = NULL }
 };
+
+
+PyDoc_STRVAR(py_glfs_object_handle__doc__,
+"GLFS object handle\n"
+"This handle provides methods to work with glusster objects (files and\n"
+"directories), instead of absolute paths.\n"
+"The intention using glfs objects is to operate based on parent parent\n"
+"object and looking up or creating objects within, OR to be used on the\n"
+"actual object thus looked up or created, and retrieve information regarding\n"
+"the same.\n"
+"The object handles may be used to open / create a gluster FD object for\n"
+"gluster FD - based operations\n"
+"The object handle is automatically closed when it is deallocated.\n"
+);
 
 PyTypeObject PyGlfsObject = {
 	.tp_name = "pyglfs.ObjectHandle",
@@ -354,7 +482,7 @@ PyTypeObject PyGlfsObject = {
 	.tp_getset = py_glfs_obj_getsetters,
 	.tp_new = py_glfs_obj_new,
 	.tp_init = py_glfs_obj_init,
-	.tp_doc = "Glusterfs filesystem object handle",
+	.tp_doc = py_glfs_object_handle__doc__,
 	.tp_dealloc = (destructor)py_glfs_obj_dealloc,
 	.tp_flags = Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,
 };
