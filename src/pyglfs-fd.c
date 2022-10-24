@@ -72,6 +72,18 @@ PyObject *init_glfs_fd(glfs_fd_t *fd_in, py_glfs_obj_t *hdl, int flags)
 	return (PyObject *)pyfd;
 }
 
+PyDoc_STRVAR(py_glfs_fd_fstat__doc__,
+"fstat()\n"
+"--\n\n"
+"Perform fstat on open glusterfs file descriptor object\n\n"
+"Parameters\n"
+"----------\n"
+"None\n\n"
+"Returns\n"
+"-------\n"
+"stat_result\n"
+);
+
 static PyObject *py_glfs_fd_fstat(PyObject *obj,
 				  PyObject *args_unused,
 				  PyObject *kwargs_unused)
@@ -92,6 +104,19 @@ static PyObject *py_glfs_fd_fstat(PyObject *obj,
 	return stat_to_pystat(&st);
 }
 
+PyDoc_STRVAR(py_glfs_fd_fsync__doc__,
+"fsync()\n"
+"--\n\n"
+"Perform fsync() on open glusterfs file descriptor object\n"
+"See manpage for fsync(2) for more details.\n\n"
+"Parameters\n"
+"----------\n"
+"None\n\n"
+"Returns\n"
+"-------\n"
+"None\n"
+);
+
 static PyObject *py_glfs_fd_fsync(PyObject *obj,
 				  PyObject *args_unused,
 				  PyObject *kwargs_unused)
@@ -111,6 +136,20 @@ static PyObject *py_glfs_fd_fsync(PyObject *obj,
 	Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(py_glfs_fd_fchdir__doc__,
+"fchdir()\n"
+"--\n\n"
+"Change the current working directory of the glusterfs mount\n"
+"to the directory as represented by the open glfs.FD object.\n"
+"Perform fsync() on open glusterfs file descriptor object\n\n"
+"Parameters\n"
+"----------\n"
+"None\n\n"
+"Returns\n"
+"-------\n"
+"None\n"
+);
+
 static PyObject *py_glfs_fd_fchdir(PyObject *obj,
 				  PyObject *args_unused,
 				  PyObject *kwargs_unused)
@@ -129,6 +168,20 @@ static PyObject *py_glfs_fd_fchdir(PyObject *obj,
 
 	Py_RETURN_NONE;
 }
+
+PyDoc_STRVAR(py_glfs_fd_fchmod__doc__,
+"fchmod(mode)\n"
+"--\n\n"
+"Change the mode of the file given by glusterfs FD to the numeric mode.\n"
+"See documentation for os.chmod() for more details.\n\n"
+"Parameters\n"
+"----------\n"
+"mode : int\n"
+"    New mode for object.\n\n"
+"Returns\n"
+"-------\n"
+"None\n"
+);
 
 static PyObject *py_glfs_fd_fchmod(PyObject *obj,
 				   PyObject *args,
@@ -153,6 +206,22 @@ static PyObject *py_glfs_fd_fchmod(PyObject *obj,
 
 	Py_RETURN_NONE;
 }
+
+PyDoc_STRVAR(py_glfs_fd_fchown__doc__,
+"fchown(uid, gid)\n"
+"--\n\n"
+"Change the owner and group id of the file given by glusterfs FD to the\n"
+"specified numeric uid and gid.\n\n"
+"Parameters\n"
+"----------\n"
+"uid : int\n"
+"    New owner UID. Special value of `-1` may be used to leave unchanged.\n"
+"gid : int\n"
+"    New owner GID. Special value of `-1` may be used to leave unchanged.\n\n"
+"Returns\n"
+"-------\n"
+"None\n"
+);
 
 static PyObject *py_glfs_fd_fchown(PyObject *obj,
 				   PyObject *args,
@@ -179,6 +248,20 @@ static PyObject *py_glfs_fd_fchown(PyObject *obj,
 	Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(py_glfs_fd_ftruncate__doc__,
+"ftruncate(length)\n"
+"--\n\n"
+"Truncate the file corresponding to glusterfs FD, \n"
+"so that it is at most `length` bytes in size.\n\n"
+"Parameters\n"
+"----------\n"
+"length : int\n"
+"    New length of file.\n"
+"Returns\n"
+"-------\n"
+"None\n"
+);
+
 static PyObject *py_glfs_fd_ftruncate(PyObject *obj,
 				      PyObject *args,
 				      PyObject *kwargs_unused)
@@ -203,13 +286,33 @@ static PyObject *py_glfs_fd_ftruncate(PyObject *obj,
 	Py_RETURN_NONE;
 }
 
+PyDoc_STRVAR(py_glfs_fd_lseek__doc__,
+"lseek(offset, whence=0)\n"
+"--\n\n"
+"Repositions the file offset of the open file description\n"
+"associated with the file descriptor fd to the argument `position`\n"
+"according to the directive `whence`. See manpage for lseek(2) for more\n"
+"details.\n\n"
+"Parameters\n"
+"----------\n"
+"offset : int\n"
+"    Offset relative to `whence` to which the fd will be repositioned.\n"
+"whence : int, optional, default=SEEK_SET\n"
+"    See manpage for lseek(2), and documentation for os.lseek() for further\n"
+"    information. Some possible values are SEEK_SET (0), SEEK_CUR (1), and\n"
+"    SEEK_END (2)\n"
+"Returns\n"
+"-------\n"
+"None\n"
+);
+
 static PyObject *py_glfs_fd_lseek(PyObject *obj,
 				  PyObject *args,
 				  PyObject *kwargs_unused)
 {
 	py_glfs_fd_t *self = (py_glfs_fd_t *)obj;
 	off_t pos;
-	int how = 0;
+	int how = SEEK_SET;
 	int err;
 
 	if (!PyArg_ParseTuple(args, "L|i", &pos, &how)) {
@@ -227,6 +330,24 @@ static PyObject *py_glfs_fd_lseek(PyObject *obj,
 
 	Py_RETURN_NONE;
 }
+
+PyDoc_STRVAR(py_glfs_fd_pread__doc__,
+"pread(offset, cnt)\n"
+"--\n\n"
+"Read at most `cnt` bytes from glusterfs file descriptor at a position of `offset`\n"
+"leaving the file offset unchanged.\n\n"
+"Parameters\n"
+"----------\n"
+"offset : int\n"
+"    Position from which to read.\n"
+"cnt: int\n"
+"    Number of bytes to read from offset\n\n"
+"Returns\n"
+"-------\n"
+"bytes\n"
+"    bytestring containing the bytes read. If the end of the file referred to by fd has\n"
+"    been reached, an empty bytes object is returned.\n"
+);
 
 static PyObject *py_glfs_fd_pread(PyObject *obj,
 				  PyObject *args,
@@ -269,6 +390,22 @@ static PyObject *py_glfs_fd_pread(PyObject *obj,
 
 	return buffer;
 }
+
+PyDoc_STRVAR(py_glfs_fd_pwrite__doc__,
+"pwrite(buf, offset)\n"
+"--\n\n"
+"Write the bytestring `buf` to file descriptor at position of `offset`, "
+"leaving the file offset unchanged.\n"
+"Parameters\n"
+"----------\n"
+"buf : bytes\n"
+"    Bytestring to write.\n"
+"offset : int\n"
+"    Position to which to write.\n\n"
+"Returns\n"
+"-------\n"
+"None\n"
+);
 
 static PyObject *py_glfs_fd_pwrite(PyObject *obj,
 				   PyObject *args,
@@ -325,6 +462,33 @@ cleanup:
 	}
 	return return_value;
 }
+
+PyDoc_STRVAR(py_glfs_fd_posix_lock__doc__,
+"posix_lock(cmd, type, whence=0, start=0, length=1, verbose=False)\n"
+"--\n\n"
+"Apply, test, or remove POSIX lock from the specified glusterfs file descriptor.\n"
+"Parameters\n"
+"----------\n"
+"cmd : int\n"
+"    locking operation to perform. See documentation for fcntl for more information.\n"
+"    Possible values are fcntl.F_GETLK, fcntl.F_SETLK, fcntl.SETLKW\n"
+"type : int\n"
+"    type of lock to operate on possible values are:\n"
+"    fcntl.F_RDLCK, fcntl.F_WRLCK, fcntl.F_UNLCK\n"
+"    Bytestring to write.\n"
+"whence : int, default=SEEK_SET\n"
+"    how to interpret the `start` value. Default is `SEEK_SET` (beginning of file)\n"
+"start : int, default=0\n"
+"    starting position of POSIX lock on file relative to `whence`.\n"
+"length : int, default=1\n"
+"    length of lock on file (from starting position).\n"
+"verbose : bool, default=False\n"
+"    Whether to return dictionary containing information from flock struct.\n\n"
+"Returns\n"
+"-------\n"
+"flock : dict or None\n"
+"    dict containing flock info if `verbose` is True (non-default)\n"
+);
 
 static PyObject *py_glfs_fd_posix_lock(PyObject *obj,
 				       PyObject *args,
@@ -415,61 +579,61 @@ static PyMethodDef py_glfs_fd_methods[] = {
 		.ml_name = "fstat",
 		.ml_meth = (PyCFunction)py_glfs_fd_fstat,
 		.ml_flags = METH_NOARGS,
-		.ml_doc = "fstat gluster fd."
+		.ml_doc = py_glfs_fd_fstat__doc__
 	},
 	{
 		.ml_name = "fsync",
 		.ml_meth = (PyCFunction)py_glfs_fd_fsync,
 		.ml_flags = METH_NOARGS,
-		.ml_doc = "fstat gluster fd."
+		.ml_doc = py_glfs_fd_fsync__doc__
 	},
 	{
 		.ml_name = "fchdir",
 		.ml_meth = (PyCFunction)py_glfs_fd_fchdir,
 		.ml_flags = METH_NOARGS,
-		.ml_doc = "change directory to path underlying fd"
+		.ml_doc = py_glfs_fd_fchdir__doc__
 	},
 	{
 		.ml_name = "fchmod",
 		.ml_meth = (PyCFunction)py_glfs_fd_fchmod,
 		.ml_flags = METH_VARARGS,
-		.ml_doc = "change permissions"
+		.ml_doc = py_glfs_fd_fchmod__doc__
 	},
 	{
 		.ml_name = "fchown",
 		.ml_meth = (PyCFunction)py_glfs_fd_fchown,
 		.ml_flags = METH_VARARGS,
-		.ml_doc = "change owner"
+		.ml_doc = py_glfs_fd_fchown__doc__
 	},
 	{
 		.ml_name = "ftruncate",
 		.ml_meth = (PyCFunction)py_glfs_fd_ftruncate,
 		.ml_flags = METH_VARARGS,
-		.ml_doc = "truncate file"
+		.ml_doc = py_glfs_fd_ftruncate__doc__
 	},
 	{
 		.ml_name = "lseek",
 		.ml_meth = (PyCFunction)py_glfs_fd_lseek,
 		.ml_flags = METH_VARARGS,
-		.ml_doc = "set position of fd"
+		.ml_doc = py_glfs_fd_lseek__doc__
 	},
 	{
 		.ml_name = "pread",
 		.ml_meth = (PyCFunction)py_glfs_fd_pread,
 		.ml_flags = METH_VARARGS,
-		.ml_doc = "read file"
+		.ml_doc = py_glfs_fd_pread__doc__
 	},
 	{
 		.ml_name = "pwrite",
 		.ml_meth = (PyCFunction)py_glfs_fd_pwrite,
 		.ml_flags = METH_VARARGS,
-		.ml_doc = "write to file"
+		.ml_doc = py_glfs_fd_pwrite__doc__
 	},
 	{
 		.ml_name = "posix_lock",
 		.ml_meth = (PyCFunction)py_glfs_fd_posix_lock,
 		.ml_flags = METH_VARARGS | METH_KEYWORDS,
-		.ml_doc = "lock file"
+		.ml_doc = py_glfs_fd_posix_lock__doc__
 	},
 	{ NULL, NULL, 0, NULL }
 };
