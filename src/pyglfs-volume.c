@@ -548,6 +548,20 @@ static void py_glfs_dealloc(py_glfs_t *self)
 	Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
+PyDoc_STRVAR(py_glfs_get_root_handle__doc__,
+"get_root_handle()\n"
+"--\n\n"
+"Opens a GLFS object handle for the root `/` of gluster volume.\n"
+"This handle may be used as basis of opening object handles for other\n"
+"files and directories in the gluster volume.\n\n"
+"Parameters\n"
+"----------\n"
+"None\n\n"
+"Returns\n"
+"-------\n"
+"volume_root : glfs.ObjectHandle\n"
+);
+
 static PyObject *py_glfs_get_root(PyObject *obj,
 				  PyObject *args_unused,
 				  PyObject *kwargs_unused)
@@ -584,6 +598,19 @@ static PyObject *py_glfs_volume_repr(PyObject *obj)
 	);
 }
 
+PyDoc_STRVAR(py_glfs_getcwd__doc__,
+"getcwd()\n"
+"--\n\n"
+"Print the current working directory for the glusterfs virtual\n"
+"mount of the glusterfs volume.\n\n"
+"Parameters\n"
+"----------\n"
+"None\n\n"
+"Returns\n"
+"-------\n"
+"cwd : string\n"
+);
+
 static PyObject *py_glfs_getcwd(PyObject *obj,
 			        PyObject *args_unused,
 			        PyObject *kwargs_unused)
@@ -603,6 +630,20 @@ static PyObject *py_glfs_getcwd(PyObject *obj,
 
 	return Py_BuildValue("s", cwd);
 }
+
+PyDoc_STRVAR(py_glfs_open_by_uuid__doc__,
+"open_by_uuid(uuid)\n"
+"--\n\n"
+"Open a new pyglfs.ObjectHandle by UUID. "
+"This requires knowing the UUID for the object beforehand."
+"Parameters\n"
+"----------\n"
+"uuid : str\n"
+"    UUID of gluster file or directory for which to open handle.\n\n"
+"Returns\n"
+"-------\n"
+"found_handle : glfs.ObjectHandle\n"
+);
 
 static PyObject *py_glfs_open_by_uuid(PyObject *obj,
 				      PyObject *args,
@@ -639,21 +680,6 @@ static PyObject *py_glfs_open_by_uuid(PyObject *obj,
 
 	return init_glfs_object(self, gl_obj, &st);
 }
-
-PyDoc_STRVAR(py_glfs_get_root_handle__doc__,
-"Open a new pyglfs.ObjectHandle object for the root `/` of gluster\n"
-"volume. This may be used as basis of opening object handles for other\n"
-"files and directories in the gluster volume."
-);
-
-PyDoc_STRVAR(py_glfs_open_by_uuid__doc__,
-"Open a new pyglfs.ObjectHandle by UUID.\n"
-"This requires knowing the UUID for the object beforehand."
-);
-
-PyDoc_STRVAR(py_glfs_getcwd__doc__,
-"Get the current working directory (string) for the volume mount."
-);
 
 static PyMethodDef py_glfs_volume_methods[] = {
 	{
