@@ -65,7 +65,7 @@ extern void _set_glfs_exc(const char *additional_info, const char *location);
 #define set_glfs_exc(additional_info) _set_glfs_exc(additional_info, __location__)
 
 extern void set_exc_from_errno(const char *func);
-extern PyTypeObject *init_pystat_type(void);
+extern bool init_pystat_type(void);
 extern PyObject *stat_to_pystat(struct stat *st);
 
 extern bool init_glfd(void);

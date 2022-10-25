@@ -64,7 +64,7 @@ PyObject *init_glfs_object(py_glfs_t *py_fs,
 	uuid_t ui;
 	ssize_t rv;
 
-	hdl = (py_glfs_obj_t *)PyObject_CallFunction((PyObject *)&PyGlfsObject, "");
+	hdl = (py_glfs_obj_t *)PyObject_CallNoArgs((PyObject *)&PyGlfsObject);
 	if (hdl == NULL) {
 		return NULL;
 	}
