@@ -98,8 +98,9 @@ PyObject* module_init(void)
 	if (PyType_Ready(&PyGlfsFd) < 0)
 		return NULL;
 
-	if (PyType_Ready(init_pystat_type()) < 0)
+        if (!init_pystat_type()) {
 		return NULL;
+	}
 
 	PyExc_GLFSError = PyErr_NewException("pyglfs.GLFSError",
 					     PyExc_RuntimeError,
