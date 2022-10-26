@@ -586,7 +586,7 @@ static PyObject *py_glfs_get_root(PyObject *obj,
 		return NULL;
 	}
 
-	return init_glfs_object(self, gl_obj, &st);
+	return init_glfs_object(self, gl_obj, &st, "/");
 }
 
 static PyObject *py_glfs_volume_repr(PyObject *obj)
@@ -678,7 +678,7 @@ static PyObject *py_glfs_open_by_uuid(PyObject *obj,
 		return NULL;
 	}
 
-	return init_glfs_object(self, gl_obj, &st);
+	return init_glfs_object(self, gl_obj, &st, NULL);
 }
 
 static PyMethodDef py_glfs_volume_methods[] = {
