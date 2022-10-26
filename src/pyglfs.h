@@ -44,6 +44,7 @@ typedef struct {
 
 typedef struct {
 	PyObject_HEAD
+	PyObject *name;
 	py_glfs_t *py_fs;
 	struct stat st;
 	char uuid_str[37];
@@ -69,6 +70,6 @@ extern bool init_pystat_type(void);
 extern PyObject *stat_to_pystat(struct stat *st);
 
 extern bool init_glfd(void);
-extern PyObject *init_glfs_object(py_glfs_t *py_fs, glfs_object_t *gl_obj, struct stat *pst);
+extern PyObject *init_glfs_object(py_glfs_t *, glfs_object_t *, const struct stat *, const char *);
 extern PyObject *init_glfs_fd(glfs_fd_t *fd_in, py_glfs_obj_t *hdl, int flags);
 #endif
