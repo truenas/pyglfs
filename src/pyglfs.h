@@ -45,7 +45,7 @@ typedef struct {
 typedef struct {
 	PyObject_HEAD
 	py_glfs_t *py_fs;
-	PyObject *py_st;
+	struct stat st;
 	char uuid_str[37];
 	glfs_object_t *gl_obj;
 } py_glfs_obj_t;

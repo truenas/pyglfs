@@ -51,7 +51,6 @@ void py_glfs_obj_dealloc(py_glfs_obj_t *self)
 		self->gl_obj = NULL;
 	}
 	Py_CLEAR(self->py_fs);
-	Py_CLEAR(self->py_st);
 	Py_TYPE(self)->tp_free((PyObject *)self);
 }
 
@@ -60,7 +59,6 @@ PyObject *init_glfs_object(py_glfs_t *py_fs,
 			   struct stat *pst)
 {
 	py_glfs_obj_t *hdl = NULL;
-	PyObject *pyst = NULL;
 	uuid_t ui;
 	ssize_t rv;
 
@@ -70,11 +68,7 @@ PyObject *init_glfs_object(py_glfs_t *py_fs,
 	}
 
 	if (pst != NULL) {
-		pyst = stat_to_pystat(pst);
-		if (pyst == NULL) {
-			Py_DECREF(hdl);
-			return NULL;
-		}
+		memcpy(&hdl->st, pst, sizeof(struct stat));
 	}
 
 	Py_BEGIN_ALLOW_THREADS
@@ -84,15 +78,46 @@ PyObject *init_glfs_object(py_glfs_t *py_fs,
 	if (rv == -1) {
 		set_glfs_exc("glfs_h_extract_handle()");
 		Py_DECREF(hdl);
-		Py_DECREF(pyst);
 		return NULL;
 	}
 	uuid_unparse(ui, hdl->uuid_str);
 	hdl->py_fs = py_fs;
 	Py_INCREF(hdl->py_fs);
 	hdl->gl_obj = gl_obj;
-	hdl->py_st = pyst;
 	return (PyObject *)hdl;
+}
+
+PyObject *py_file_type_str(mode_t mode)
+{
+	const char *file_type_str = NULL;
+
+	switch (mode & S_IFMT) {
+	case S_IFDIR:
+		file_type_str = "DIRECTORY";
+		break;
+	case S_IFREG:
+		file_type_str = "FILE";
+		break;
+	case S_IFLNK:
+		file_type_str = "SYMLINK";
+		break;
+	case S_IFIFO:
+		file_type_str = "FIFO";
+		break;
+	case S_IFSOCK:
+		file_type_str = "SOCKET";
+		break;
+	case S_IFCHR:
+		file_type_str = "CHAR";
+		break;
+	case S_IFBLK:
+		file_type_str = "BLOCK";
+		break;
+	default:
+		file_type_str = "UNKNOWN";
+	};
+
+	return PyUnicode_FromString(file_type_str);
 }
 
 PyDoc_STRVAR(py_glfs_obj_lookup__doc__,
@@ -314,7 +339,6 @@ static PyObject *py_glfs_obj_stat(PyObject *obj,
 				  PyObject *kwargs_unused)
 {
 	py_glfs_obj_t *self = (py_glfs_obj_t *)obj;
-	PyObject *new_st = NULL;
 	struct stat st;
 	int err;
 
@@ -327,16 +351,8 @@ static PyObject *py_glfs_obj_stat(PyObject *obj,
 		return NULL;
 	}
 
-	new_st = stat_to_pystat(&st);
-	if (new_st == NULL) {
-		return NULL;
-	}
-
-	Py_CLEAR(self->py_st);
-	/* store reference to latest stat in object handle */
-	self->py_st = new_st;
-	Py_INCREF(new_st);
-	return new_st;
+	memcpy(&self->st, &st, sizeof(struct stat));
+	return stat_to_pystat(&st);
 }
 
 PyDoc_STRVAR(py_glfs_obj_open__doc__,
@@ -426,12 +442,35 @@ static PyObject *py_glfs_obj_get_uuid(PyObject *obj, void *closure)
 static PyObject *py_glfs_obj_get_stat(PyObject *obj, void *closure)
 {
 	py_glfs_obj_t *self = (py_glfs_obj_t *)obj;
-	if (self->py_st == NULL) {
+
+	if (self->st.st_dev == 0) {
+		/* stat struct is not populated */
 		Py_RETURN_NONE;
 	}
 
-	Py_INCREF(self->py_st);
-	return self->py_st;
+	return stat_to_pystat(&self->st);
+}
+
+static PyObject *py_glfs_obj_get_file_type(PyObject *obj, void *closure)
+{
+	py_glfs_obj_t *self = (py_glfs_obj_t *)obj;
+	PyObject *file_type_str = NULL;
+
+	if (self->st.st_dev == 0) {
+		/* stat struct is not populated */
+		Py_RETURN_NONE;
+	}
+
+	file_type_str = py_file_type_str(self->st.st_mode);
+	if (file_type_str == NULL) {
+		return NULL;
+	}
+
+	return Py_BuildValue(
+		"{s:l,s:N}",
+		"raw", self->st.st_mode & S_IFMT,
+		"parsed", file_type_str
+	);
 }
 
 PyDoc_STRVAR(py_glfs_obj_get_stat__doc__,
@@ -443,8 +482,14 @@ PyDoc_STRVAR(py_glfs_obj_get_stat__doc__,
 
 PyDoc_STRVAR(py_glfs_obj_get_uuid__doc__,
 "UUID for GLFS object handle.\n"
-"This is exctracted when the python object was created, and may be used\n"
+"This is extracted when the python object was created, and may be used\n"
 "to open the file via the open_by_uuid() method for the glfs.Volume object.\n"
+);
+
+PyDoc_STRVAR(py_glfs_obj_get_file_type__doc__,
+"File type of GLFS object handle.\n"
+"Dict containing raw and parsed file type bits from cached stat information.\n"
+"returns None if stat struct internal to handle is unpopulated.\n"
 );
 
 static PyGetSetDef py_glfs_obj_getsetters[] = {
@@ -458,9 +503,34 @@ static PyGetSetDef py_glfs_obj_getsetters[] = {
 		.get     = (getter)py_glfs_obj_get_uuid,
 		.doc     = py_glfs_obj_get_uuid__doc__,
 	},
+	{
+		.name    = discard_const_p(char, "file_type"),
+		.get     = (getter)py_glfs_obj_get_file_type,
+		.doc     = py_glfs_obj_get_file_type__doc__,
+	},
 	{ .name = NULL }
 };
 
+
+static PyObject *py_glfs_obj_repr(PyObject *obj)
+{
+	py_glfs_obj_t *self = (py_glfs_obj_t *)obj;
+	PyObject *file_type_str = NULL;
+	PyObject *out = NULL;
+
+	file_type_str = py_file_type_str(self->st.st_mode);
+	if (file_type_str == NULL) {
+		return NULL;
+	}
+
+        out = PyUnicode_FromFormat(
+                "pyglfs.ObjectHandle(uuid=%s, file_type=%U)",
+                self->uuid_str, file_type_str
+        );
+
+	Py_DECREF(file_type_str);
+	return out;
+}
 
 PyDoc_STRVAR(py_glfs_object_handle__doc__,
 "GLFS object handle\n"
@@ -482,6 +552,7 @@ PyTypeObject PyGlfsObject = {
 	.tp_getset = py_glfs_obj_getsetters,
 	.tp_new = py_glfs_obj_new,
 	.tp_init = py_glfs_obj_init,
+	.tp_repr = py_glfs_obj_repr,
 	.tp_doc = py_glfs_object_handle__doc__,
 	.tp_dealloc = (destructor)py_glfs_obj_dealloc,
 	.tp_flags = Py_TPFLAGS_DEFAULT|Py_TPFLAGS_BASETYPE,
