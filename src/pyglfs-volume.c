@@ -582,7 +582,7 @@ static PyObject *py_glfs_get_root(PyObject *obj,
 	Py_END_ALLOW_THREADS
 
 	if (gl_obj == NULL) {
-                set_glfs_exc("glfs_h_lookupat()");
+		set_glfs_exc("glfs_h_lookupat()");
 		return NULL;
 	}
 

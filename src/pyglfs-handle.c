@@ -552,10 +552,10 @@ static PyObject *py_glfs_obj_repr(PyObject *obj)
 		return NULL;
 	}
 
-        out = PyUnicode_FromFormat(
-                "pyglfs.ObjectHandle(uuid=%s, name=%V, file_type=%U)",
-                self->uuid_str, self->name, "<UNKNOWN>", file_type_str
-        );
+	out = PyUnicode_FromFormat(
+		"pyglfs.ObjectHandle(uuid=%s, name=%V, file_type=%U)",
+		self->uuid_str, self->name, "<UNKNOWN>", file_type_str
+	);
 
 	Py_DECREF(file_type_str);
 	return out;

@@ -425,7 +425,7 @@ static PyObject *py_glfs_fd_pwrite(PyObject *obj,
 
 	if (!PyObject_CheckBuffer(buf)) {
 		PyErr_SetString(
-                        PyExc_TypeError,
+			PyExc_TypeError,
 			"not a buffer."
 		);
 		goto cleanup;
