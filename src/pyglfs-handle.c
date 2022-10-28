@@ -397,6 +397,213 @@ static PyObject *py_glfs_obj_open(PyObject *obj,
 	return init_glfs_fd(gl_fd, self, flags);
 }
 
+PyDoc_STRVAR(py_glfs_obj_contents__doc__,
+"contents()\n"
+"--\n\n"
+"Read handle contents. Return will vary depending on underlying\n"
+"file type.\n"
+"FILE - contents of file.\n"
+"DIRECTORY - list of directory entry names.\n"
+"SYMLINK - destination of symlink\n\n"
+"Parameters\n"
+"----------\n"
+"flags : int\n"
+"    open(2) flags to use to open the handle. O_CREAT is not supported.\n\n"
+"Returns\n"
+"-------\n"
+"contents : bytes (FILE), list (DIRECTORY), str (SYMLINK)\n"
+);
+
+static PyObject *read_contents_reg(py_glfs_obj_t *self)
+{
+	glfs_fd_t *gl_fd = NULL;
+	PyObject *pyfd = NULL;
+	PyObject *data = NULL;
+
+
+	// short-circuit if size is 0.
+	if (self->st.st_size == 0) {
+		return PyBytes_FromString("");
+	}
+
+	Py_BEGIN_ALLOW_THREADS
+	gl_fd = glfs_h_open(self->py_fs->fs, self->gl_obj, O_RDONLY);
+	Py_END_ALLOW_THREADS
+
+	if (gl_fd == NULL) {
+		set_glfs_exc("glfs_h_open()");
+		return NULL;
+	}
+
+	pyfd = init_glfs_fd(gl_fd, self, O_RDONLY);
+	if (pyfd == NULL) {
+		return NULL;
+	}
+
+	data = PyObject_CallMethod(
+		pyfd,
+		"pread",
+		"Ln",
+		0,
+		self->st.st_size
+	);
+
+	// dealloc of pyfd closes gl_fd
+	Py_DECREF(pyfd);
+
+	return data;
+}
+
+typedef char dstring[256];
+
+struct d_array {
+	dstring *dirs;
+	size_t next_idx;
+	size_t alloc;
+};
+
+static bool get_dir_listing(glfs_fd_t *fd, struct d_array *arr)
+{
+	struct dirent prev, *result = NULL;
+	int err;
+
+	*arr = (struct d_array) {
+		.dirs = NULL,
+		.next_idx = 0,
+		.alloc = 16
+	};
+
+	arr->dirs = calloc(arr->alloc, sizeof(dstring));
+	if (arr->dirs == NULL) {
+		return false;
+	}
+
+	for (;;) {
+		err = glfs_readdir_r(fd, &prev, &result);
+		if (err) {
+			free(arr->dirs);
+			arr->dirs = NULL;
+			return false;
+		}
+		if (result == NULL) {
+			break;
+		}
+
+		if (strcmp(result->d_name, ".") == 0 ||
+		    (strcmp(result->d_name, "..") == 0)) {
+			continue;
+		}
+
+		strlcpy(arr->dirs[arr->next_idx], result->d_name, sizeof(dstring));
+		arr->next_idx++;
+		if (arr->next_idx == arr->alloc) {
+			dstring *new_dirs = NULL;
+			arr->alloc *= 8;
+			new_dirs = realloc(arr->dirs, sizeof(dstring) * arr->alloc);
+			if (new_dirs == NULL) {
+				free(arr->dirs);
+				arr->dirs = NULL;
+				return false;
+			}
+
+			arr->dirs = new_dirs;
+		}
+	}
+
+	return true;
+}
+
+static PyObject *read_contents_dir(py_glfs_obj_t *self)
+{
+	PyObject *data = NULL;
+	struct d_array arr;
+	glfs_fd_t *gl_fd = NULL;
+	bool ok;
+	size_t i;
+
+	Py_BEGIN_ALLOW_THREADS
+	gl_fd = glfs_h_opendir(self->py_fs->fs, self->gl_obj);
+	Py_END_ALLOW_THREADS
+	if (gl_fd == NULL) {
+		set_glfs_exc("glfs_h_opendir()");
+		return NULL;
+	}
+	Py_BEGIN_ALLOW_THREADS
+	ok = get_dir_listing(gl_fd, &arr);
+	glfs_closedir(gl_fd);
+	Py_END_ALLOW_THREADS
+	if (!ok) {
+		set_glfs_exc("glfs_h_readdir()");
+		return NULL;
+	}
+
+	data = PyList_New(arr.next_idx);
+	if (data == NULL) {
+		return NULL;
+	}
+
+	for (i = 0; i < arr.next_idx; i++) {
+		PyObject *pydir = NULL;
+		pydir = PyUnicode_FromString(arr.dirs[i]);
+		if (pydir == NULL) {
+			Py_CLEAR(data);
+			break;
+		}
+
+		if (PyList_SetItem(data, i, pydir) == -1) {
+			Py_CLEAR(data);
+			break;
+		}
+	}
+	free(arr.dirs);
+	return data;
+}
+
+static PyObject *read_contents_lnk(py_glfs_obj_t *self)
+{
+	/* readlink does not NULL-terminate after copying */
+	char path[PATH_MAX + 1] = { 0 };
+	int err;
+
+	Py_BEGIN_ALLOW_THREADS
+	err = glfs_h_readlink(self->py_fs->fs, self->gl_obj, path, PATH_MAX);
+	Py_END_ALLOW_THREADS
+
+	if (err == -1) {
+		set_glfs_exc("glfs_h_readlink()");
+		return NULL;
+	}
+
+	return PyUnicode_FromString(path);
+}
+
+static PyObject *py_glfs_obj_contents(PyObject *obj,
+				      PyObject *args_unused,
+				      PyObject *kwargs_unused)
+{
+	py_glfs_obj_t *self = (py_glfs_obj_t *)obj;
+	PyObject *rv = NULL;
+
+	switch (self->st.st_mode & S_IFMT) {
+	case S_IFDIR:
+		rv = read_contents_dir(self);
+		break;
+	case S_IFREG:
+		rv = read_contents_reg(self);
+		break;
+	case S_IFLNK:
+		rv = read_contents_lnk(self);
+		break;
+	default:
+		PyErr_SetString(
+			PyExc_NotImplementedError,
+			"contents() not implemented for file type"
+                );
+	}
+
+	return rv;
+}
+
 static PyMethodDef py_glfs_obj_methods[] = {
 	{
 		.ml_name = "lookup",
@@ -433,6 +640,12 @@ static PyMethodDef py_glfs_obj_methods[] = {
 		.ml_meth = (PyCFunction)py_glfs_obj_open,
 		.ml_flags = METH_VARARGS,
 		.ml_doc = py_glfs_obj_open__doc__
+	},
+	{
+		.ml_name = "contents",
+		.ml_meth = (PyCFunction)py_glfs_obj_contents,
+		.ml_flags = METH_VARARGS,
+		.ml_doc = py_glfs_obj_contents__doc__
 	},
 	{ NULL, NULL, 0, NULL }
 };
