@@ -44,8 +44,14 @@ static int py_glfs_fd_init(PyObject *obj,
 void py_glfs_fd_dealloc(py_glfs_fd_t *self)
 {
 	if (self->fd) {
-		if (glfs_close(self->fd) == -1) {
-			fprintf(stderr, "glfs_close() failed: %s",
+		int rv;
+		if (self->flags & O_DIRECTORY) {
+			rv = glfs_closedir(self->fd);
+		} else {
+			rv = glfs_close(self->fd);
+		}
+		if (rv == -1) {
+			fprintf(stderr, "glusterfs fd close failed: %s\n",
 				strerror(errno));
 		}
 		self->fd = NULL;
