@@ -386,7 +386,11 @@ static PyObject *py_glfs_obj_open(PyObject *obj,
 	}
 
 	Py_BEGIN_ALLOW_THREADS
-	gl_fd = glfs_h_open(self->py_fs->fs, self->gl_obj, flags);
+	if (flags & O_DIRECTORY) {
+		gl_fd = glfs_h_opendir(self->py_fs->fs, self->gl_obj);
+	} else {
+		gl_fd = glfs_h_open(self->py_fs->fs, self->gl_obj, flags);
+	}
 	Py_END_ALLOW_THREADS
 
 	if (gl_fd == NULL) {
