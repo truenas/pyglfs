@@ -5,7 +5,9 @@ mod_def = Extension(
     sources=[
         'src/pyglfs.c',
         'src/pyglfs-fd.c',
+        'src/pyglfs-fts.c',
         'src/pyglfs-handle.c',
+        'src/pyglfs-iter.c',
         'src/pyglfs-stat.c',
         'src/pyglfs-volume.c'
     ],

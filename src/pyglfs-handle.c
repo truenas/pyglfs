@@ -608,6 +608,54 @@ static PyObject *py_glfs_obj_contents(PyObject *obj,
 	return rv;
 }
 
+PyDoc_STRVAR(py_glfs_obj_fts_open__doc__,
+"fts_open(stat=true, max_depth=-1)\n"
+"--\n\n"
+"Open glfs.FTSHandle for directory iteration.\n\n"
+"Parameters\n"
+"----------\n"
+"stat : bool, optional, default=True\n"
+"    Retrieve stat information for object while iterating.\n"
+"max_depth: int, optional, default=-1\n"
+"    Maximum recursion depth for iteration.\n"
+"    Defaults to -1 (no limit)\n\n"
+"Returns\n"
+"    Open glfs.FTSHandle\n"
+);
+static PyObject *py_glfs_obj_fts_open(PyObject *obj,
+				      PyObject *args,
+				      PyObject *kwargs)
+{
+	py_glfs_obj_t *self = (py_glfs_obj_t *)obj;
+	int flags = PYGLFS_FTS_FLAG_DO_RECURSE;
+	int max_depth = -1;
+	bool do_stat = true;
+
+	const char *kwnames [] = {
+		"stat",
+		"max_depth",
+		NULL
+	};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+					 "|pi",
+					 discard_const_p(char *, kwnames),
+					 &do_stat,
+					 &max_depth)) {
+		return NULL;
+	}
+
+	if (do_stat) {
+		flags |= PYGLFS_FTS_FLAG_DO_STAT;
+	}
+
+	return PyObject_CallFunction(
+		(PyObject *)&PyGlfsFTS,
+		"Oii",
+		self, flags, max_depth
+	);
+}
+
 static PyMethodDef py_glfs_obj_methods[] = {
 	{
 		.ml_name = "lookup",
@@ -644,6 +692,12 @@ static PyMethodDef py_glfs_obj_methods[] = {
 		.ml_meth = (PyCFunction)py_glfs_obj_open,
 		.ml_flags = METH_VARARGS,
 		.ml_doc = py_glfs_obj_open__doc__
+	},
+	{
+		.ml_name = "fts_open",
+		.ml_meth = (PyCFunction)py_glfs_obj_fts_open,
+		.ml_flags = METH_VARARGS | METH_KEYWORDS,
+		.ml_doc = py_glfs_obj_fts_open__doc__
 	},
 	{
 		.ml_name = "contents",
