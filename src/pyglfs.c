@@ -98,6 +98,12 @@ PyObject* module_init(void)
 	if (PyType_Ready(&PyGlfsFd) < 0)
 		return NULL;
 
+	if (PyType_Ready(&PyGlfsFTS) < 0)
+		return NULL;
+
+	if (PyType_Ready(&PyGlfsFTSENT) < 0)
+		return NULL;
+
         if (!init_pystat_type()) {
 		return NULL;
 	}
