@@ -783,7 +783,7 @@ static PyObject *py_glfs_obj_setattrs(PyObject *obj,
 	};
 
 	if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-					 "|iiiiipi",
+					 "|iiiiibi",
 					 discard_const_p(char *, kwnames),
 					 &uid,
 					 &gid,
