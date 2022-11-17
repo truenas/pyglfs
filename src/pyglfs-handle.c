@@ -656,6 +656,214 @@ static PyObject *py_glfs_obj_fts_open(PyObject *obj,
 	);
 }
 
+struct setattrs_cb_state {
+	struct stat *to_set;
+	int valid;
+	char path[PATH_MAX];
+};
+
+static bool setattrs_cb(py_glfs_obj_t *root,
+			glfs_object_t *tmp_obj,
+			struct dirent *entry,
+			struct stat *st_unused,
+			size_t depth,
+			const char *parent_path,
+			void *private)
+{
+	struct setattrs_cb_state *st = (struct setattrs_cb_state *)private;
+	int rv;
+
+	rv = glfs_h_setattrs(root->py_fs->fs, tmp_obj, st->to_set, st->valid);
+	if (rv == -1) {
+		strlcpy(st->path, parent_path, sizeof(st->path));
+		return false;
+	}
+	return true;
+}
+
+static bool do_recursive_setattrs(py_glfs_obj_t *self,
+				  struct stat *to_set,
+				  int valid)
+{
+	int err;
+	glfs_fd_t *fd = NULL;
+	struct setattrs_cb_state st = {
+		.to_set = to_set,
+		.valid = valid,
+	};
+	glfs_object_cb_t iter_cb = {
+		.state = &st,
+		.flags = PYGLFS_FTS_FLAG_DO_RECURSE,
+		.fn = setattrs_cb,
+		.max_depth = -1,
+	};
+
+	Py_BEGIN_ALLOW_THREADS
+	fd = glfs_h_opendir(self->py_fs->fs, self->gl_obj);
+	Py_END_ALLOW_THREADS
+	if (fd == NULL) {
+		set_glfs_exc("glfs_h_opendir()");
+		return false;
+	}
+
+	iter_cb.root.fd = fd;
+
+	Py_BEGIN_ALLOW_THREADS
+	err = iter_glfs_object_handle(self, &iter_cb);
+	glfs_closedir(fd);
+	Py_END_ALLOW_THREADS
+
+	if (err < 0) {
+		char *errstr = NULL;
+		if (asprintf(&errstr, "%s: glfs_h_set_attrs()", st.path) == -1) {
+			errstr = NULL;
+			set_glfs_exc("glfs_h_setattrs()");
+		} else {
+			set_glfs_exc(errstr);
+		}
+		free(errstr);
+		return false;
+	}
+	return true;
+
+}
+
+PyDoc_STRVAR(py_glfs_obj_setattrs__doc__,
+"setattrs(uid=-1, gid=-1, mode=-2, atime=-2, mtime=-1, recursive=False, max_depth=-1)\n"
+"--\n\n"
+"Bulk update of attributes on glfs object handle.\n\n"
+"Parameters\n"
+"----------\n"
+"uid : int, optional, default=-1\n"
+"    New owner UID. Special value of `-1` may be used to leave unchanged.\n"
+"gid : int, optional, default=-1\n"
+"    New owner GID. Special value of `-1` may be used to leave unchanged.\n"
+"mode : int, optional, default=-1\n"
+"    New mode for object. Special value of `-1` may be used to leave unchanged.\n"
+"atime : int, optional, default=-2\n"
+"    Not currently implemented. Future enhancement will allow setting atime.\n"
+"    NOTE: type may change once this is implemented. -2 is special value UTIME_OMIT.\n"
+"mtime : int, optional, default=-2\n"
+"    Not currently implemented. Future enhancement will allow setting mtime.\n"
+"    NOTE: type may change once this is implemented. -2 is special value UTIME_OMIT.\n"
+"recursive : bool, optional, default=False\n"
+"    Perform the setattr operation recursively. The recursive operation will fail on files.\n"
+"max_depth: int, optional, default=-1\n"
+"    Maximum recursion depth for iteration.\n"
+"    Defaults to -1 (no limit)\n\n"
+"Returns\n"
+"-------\n"
+"    None\n"
+);
+static PyObject *py_glfs_obj_setattrs(PyObject *obj,
+				      PyObject *args,
+				      PyObject *kwargs)
+{
+	py_glfs_obj_t *self = (py_glfs_obj_t *)obj;
+	int uid = -1;
+	int gid = -1;
+	int valid = 0;
+	struct stat to_set;
+	int mode = -1;
+	int max_depth = -1;
+	// TODO: add timestamp support. These are just placeholders.
+	int not_impl_atime = -2, not_impl_mtime = -2;
+	int rv;
+	bool recursive = false;
+
+	const char *kwnames [] = {
+		"uid",
+		"gid",
+		"mode",
+		"atime",
+		"mtime",
+		"recursive",
+		"max_depth",
+		NULL
+	};
+
+	if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+					 "|iiiiibi",
+					 discard_const_p(char *, kwnames),
+					 &uid,
+					 &gid,
+					 &mode,
+					 &not_impl_atime,
+					 &not_impl_mtime,
+					 &recursive,
+					 &max_depth)) {
+		return NULL;
+	}
+
+	if ((uid == -1) && (gid == -1) && (mode == -1)) {
+		PyErr_SetString(
+			PyExc_ValueError,
+			"At least one of following must be specified: "
+			"uid, gid, mode."
+                );
+		return NULL;
+	}
+
+	if ((mode > (S_IRWXU | S_IRWXG | S_IRWXO | S_ISUID | S_ISGID | S_ISVTX)) ||
+	    (mode < -1)) {
+		PyErr_SetString(
+			PyExc_ValueError,
+			"Invalid file mode."
+			"uid, gid, mode."
+                );
+		return NULL;
+	}
+
+	if (!recursive && (max_depth != -1)) {
+		PyErr_SetString(
+			PyExc_ValueError,
+			"Max depth may only be set on recursive operations."
+                );
+		return NULL;
+	}
+
+	if ((not_impl_atime != -2) || (not_impl_mtime != -2)) {
+		PyErr_SetString(
+			PyExc_NotImplementedError,
+			"Timestamp support is not yet implemented."
+                );
+		return NULL;
+	}
+
+	if (uid != -1) {
+		valid |= GFAPI_SET_ATTR_UID;
+	}
+
+	if (gid != -1) {
+		valid |= GFAPI_SET_ATTR_GID;
+	}
+
+	if (mode != -1) {
+		valid |= GFAPI_SET_ATTR_MODE;
+	}
+
+	to_set = (struct stat){
+		.st_uid = (uid_t)uid,
+		.st_gid = (gid_t)gid,
+		.st_mode = mode == -1 ? 0 : (mode_t)mode,
+	};
+
+	Py_BEGIN_ALLOW_THREADS
+	rv = glfs_h_setattrs(self->py_fs->fs, self->gl_obj, &to_set, valid);
+	Py_END_ALLOW_THREADS
+
+	if (rv == -1) {
+		set_glfs_exc("glfs_h_setattrs()");
+		return NULL;
+	}
+
+	if (recursive && !do_recursive_setattrs(self, &to_set, valid)) {
+		Py_RETURN_NONE;
+	}
+
+	Py_RETURN_NONE;
+}
+
 static PyMethodDef py_glfs_obj_methods[] = {
 	{
 		.ml_name = "lookup",
@@ -704,6 +912,12 @@ static PyMethodDef py_glfs_obj_methods[] = {
 		.ml_meth = (PyCFunction)py_glfs_obj_contents,
 		.ml_flags = METH_VARARGS,
 		.ml_doc = py_glfs_obj_contents__doc__
+	},
+	{
+		.ml_name = "setattrs",
+		.ml_meth = (PyCFunction)py_glfs_obj_setattrs,
+		.ml_flags = METH_VARARGS | METH_KEYWORDS,
+		.ml_doc = py_glfs_obj_setattrs__doc__
 	},
 	{ NULL, NULL, 0, NULL }
 };
