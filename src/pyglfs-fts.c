@@ -381,6 +381,8 @@ PyObject *init_fts_iter(py_glfs_fts_t *self)
 	if (iter == NULL) {
 		return NULL;
 	}
+	memset(&iter->iter_cb.root, 0, sizeof(iter_dir_t));
+	memset(&iter->iter_cb.children, 0, sizeof(struct iter_children));
 
 	Py_BEGIN_ALLOW_THREADS
 	iter->iter_cb.root.fd = glfs_h_opendir(
